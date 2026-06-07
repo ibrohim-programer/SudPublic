@@ -5,6 +5,8 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 import json
 
+from utils import get_app_data_dir
+
 CONFIG_FILE = "sudparser_config.json"
 
 
@@ -32,7 +34,9 @@ class Config:
     monitor_interval_minutes: int = 10
     monitor_interval_seconds: int = 600
     notify_on_new_file: bool = True
-    state_db_path: str = "./sudparser_state.json"
+    state_db_path: str = field(
+        default_factory=lambda: str(get_app_data_dir() / "sudparser_state.json")
+    )
 
     def __post_init__(self):
         # monitor_interval_seconds ni minutdan hisobla

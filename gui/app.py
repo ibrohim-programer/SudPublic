@@ -77,11 +77,6 @@ class SudParserApp(tb.Window):
         self.downloader: Optional[Downloader] = None
         self.monitor:    Optional[MonitorEngine] = None
 
-        # Hujjat turlari — oldindan standart ro'yxat bilan to'ldiriladi.
-        # API dan yuklangач yangilanadi (_load_doc_types). Shunday qilib
-        # foydalanuvchi API javobini kutmasdan ham "Yuklash" tugmasini bosa oladi.
-        self._doc_types = list(DEFAULT_DOC_TYPES)
-
         # ─── GUI qurish ───────────────────────────────────────────────────
         self._build_ui()
 

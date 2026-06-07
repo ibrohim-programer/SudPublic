@@ -16,8 +16,8 @@ def main():
     if is_frozen():
         os.chdir(str(get_app_data_dir()))
 
-    # Loglar papkasini yaratish
-    Path("logs").mkdir(exist_ok=True)
+    # Loglar papkasini yaratish (har doim yoziladigan ma'lumotlar papkasida)
+    (get_app_data_dir() / "logs").mkdir(parents=True, exist_ok=True)
 
     # Dasturni ishga tushirish
     from gui.app import SudParserApp

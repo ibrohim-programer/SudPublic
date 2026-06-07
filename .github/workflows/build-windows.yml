@@ -1,0 +1,39 @@
+name: Build Windows EXE
+
+# SUDPUBLIK.exe ni Windows muhitida avtomatik quradi.
+# Linux/Mac da Windows .exe qurib bo'lmaydi — shuning uchun bu workflow
+# GitHub ning Windows serverida quradi va natijani yuklab olish mumkin.
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:        # "Run workflow" tugmasi orqali qo'lda ishga tushirish
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Kodni olish
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 o'rnatish
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Kutubxonalarni o'rnatish
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: SUDPUBLIK.exe ni qurish
+        run: pyinstaller build.spec --noconfirm
+
+      - name: Natijani yuklash uchun saqlash
+        uses: actions/upload-artifact@v4
+        with:
+          name: SUDPUBLIK-windows
+          path: dist/SUDPUBLIK.exe
+          if-no-files-found: error
