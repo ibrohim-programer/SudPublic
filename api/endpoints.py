@@ -4,9 +4,9 @@
 BASE_URL = "https://publication.sud.uz"
 
 PUBLICATIONS_URL = f"{BASE_URL}/unauthorized/publications"
-TYPES_URL = f"{BASE_URL}/types"
-CATEGORY_URL = f"{BASE_URL}/category"
-FILE_URL = f"{BASE_URL}/file/{{file_id}}"
+TYPES_URL = f"{BASE_URL}/unauthorized/types"
+CATEGORY_URL = f"{BASE_URL}/unauthorized/category"
+FILE_URL = f"{BASE_URL}/api/file/download/{{file_id}}"
 
 # Sud yo'nalishlari (court_type qiymatlari)
 COURT_TYPES: dict[str, str] = {

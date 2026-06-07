@@ -1,0 +1,13 @@
+{
+  "download_path": "/home/ubuntu/Documents/SudPublik",
+  "max_workers": 5,
+  "request_delay": 0.5,
+  "retry_count": 3,
+  "timeout": 30,
+  "skip_existing": false,
+  "log_level": "INFO",
+  "monitor_interval_minutes": 10,
+  "monitor_interval_seconds": 600,
+  "notify_on_new_file": true,
+  "state_db_path": "./sudparser_state.json"
+}

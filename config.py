@@ -8,10 +8,19 @@ import json
 CONFIG_FILE = "sudparser_config.json"
 
 
+def default_download_path() -> str:
+    """
+    Standart saqlash papkasi: foydalanuvchining Documents papkasi ichida.
+    Cross-platform (Windows, Linux, macOS).
+    Misol: /home/ubuntu/Documents/Sud_Hujjatlari
+    """
+    return str(Path.home() / "Documents" / "Sud_Hujjatlari")
+
+
 @dataclass
 class Config:
     # Yuklab olish
-    download_path: str = "./Sud_Hujjatlari"
+    download_path: str = field(default_factory=default_download_path)
     max_workers: int = 5
     request_delay: float = 0.5
     retry_count: int = 3

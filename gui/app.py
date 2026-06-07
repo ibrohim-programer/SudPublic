@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox
 import threading
 import time
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -19,8 +20,8 @@ from state_tracker import StateTracker
 from logger import CsvLogger, SessionSummary
 from downloader import Downloader
 from monitor import MonitorEngine
-from utils import date_to_timestamp, ensure_dir, get_resource_path, now_str
-from gui.components import ScrolledLog, ProgressBar, DateEntry
+from utils import date_to_timestamp, ensure_dir, get_resource_path, now_str, open_path
+from gui.components import ScrolledLog, ProgressBar, DateEntry, StatCard, add_tooltip
 from gui.tray import TrayManager
 
 
@@ -30,20 +31,28 @@ class SudParserApp(tb.Window):
     Barcha tarmoq operatsiyalari alohida threadda — GUI hech qachon muzlamaydi.
     """
 
-    APP_TITLE   = "SudParser — public.sud.uz Hujjat Yuklovchi  v3.0"
-    WINDOW_SIZE = "850x780"
+    APP_TITLE   = "SudParser — Sud Hujjatlari Yuklovchi"
+    APP_VERSION = "v3.1"
+    WINDOW_SIZE = "960x860"
 
     def __init__(self):
         super().__init__(themename="darkly")
-        self.title(self.APP_TITLE)
+        self.title(f"{self.APP_TITLE}  {self.APP_VERSION}")
         self.geometry(self.WINDOW_SIZE)
         self.resizable(True, True)
-        self.minsize(760, 620)
+        self.minsize(820, 680)
 
-        # Icon o'rnatish
+        # Icon o'rnatish (cross-platform)
         try:
-            icon = get_resource_path("assets/icon.ico")
-            self.iconbitmap(icon)
+            icon_path = get_resource_path("assets/icon.ico")
+            if sys.platform.startswith("win"):
+                # Windows: .ico to'g'ridan-to'g'ri ishlaydi
+                self.iconbitmap(icon_path)
+            else:
+                # Linux/macOS: Pillow orqali PhotoImage ga o'tkazamiz
+                from PIL import Image, ImageTk
+                self._icon_img = ImageTk.PhotoImage(Image.open(icon_path))
+                self.iconphoto(True, self._icon_img)
         except Exception:
             pass
 
@@ -68,6 +77,11 @@ class SudParserApp(tb.Window):
         self.downloader: Optional[Downloader] = None
         self.monitor:    Optional[MonitorEngine] = None
 
+        # Hujjat turlari — oldindan standart ro'yxat bilan to'ldiriladi.
+        # API dan yuklangач yangilanadi (_load_doc_types). Shunday qilib
+        # foydalanuvchi API javobini kutmasdan ham "Yuklash" tugmasini bosa oladi.
+        self._doc_types = list(DEFAULT_DOC_TYPES)
+
         # ─── GUI qurish ───────────────────────────────────────────────────
         self._build_ui()
 
@@ -90,140 +104,280 @@ class SudParserApp(tb.Window):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
-        pad = {"padx": 10, "pady": 4}
+        self._build_header()
 
-        # ── Sarlavha ──────────────────────────────────────────────────────
-        hdr = tb.Label(
-            self,
-            text="🏛️  SudParser — public.sud.uz Hujjat Yuklovchi  v3.0",
-            font=("Segoe UI", 13, "bold"),
-            bootstyle="inverse-primary",
-            anchor="center",
+        # ── Asosiy ish maydoni: ikki ustun ────────────────────────────────
+        body = tb.Frame(self, padding=(12, 6))
+        body.pack(fill=BOTH, expand=True)
+
+        left  = tb.Frame(body)
+        left.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 6))
+        right = tb.Frame(body)
+        right.pack(side=LEFT, fill=BOTH, expand=True, padx=(6, 0))
+
+        self._build_mode_section(left)
+        self._build_court_section(left)
+        self._build_filter_section(left)
+
+        self._build_path_section(right)
+        self._build_settings_section(right)
+        self._build_stats_section(right)
+
+        # ── Amal tugmalari (to'liq kenglik) ───────────────────────────────
+        self._build_action_buttons()
+
+        # ── Progress + Log (to'liq kenglik) ───────────────────────────────
+        self._build_progress_and_log()
+
+        # ── Pastki holat paneli ───────────────────────────────────────────
+        self._build_statusbar()
+
+    # ── Header ────────────────────────────────────────────────────────────────
+
+    def _build_header(self) -> None:
+        header = tb.Frame(self, bootstyle="dark", padding=(16, 12))
+        header.pack(fill=X)
+
+        title_box = tb.Frame(header, bootstyle="dark")
+        title_box.pack(side=LEFT)
+        tb.Label(
+            title_box, text="🏛️  SudParser",
+            font=("Segoe UI", 18, "bold"), bootstyle="inverse-dark",
+        ).pack(anchor="w")
+        tb.Label(
+            title_box,
+            text="Sud hujjatlarini avtomatik yuklab oluvchi  •  public.sud.uz",
+            font=("Segoe UI", 9), bootstyle="secondary",
+        ).pack(anchor="w")
+
+        # O'ng tarafda: mavzu almashtirgich
+        right_box = tb.Frame(header, bootstyle="dark")
+        right_box.pack(side=RIGHT)
+        self._theme_var = tk.StringVar(value="darkly")
+        theme_btn = tb.Button(
+            right_box, text="🌗  Mavzu", command=self._toggle_theme,
+            bootstyle="secondary-outline", width=10,
         )
-        hdr.pack(fill=X, pady=(0, 4))
+        theme_btn.pack(side=RIGHT, padx=2)
+        add_tooltip(theme_btn, "Yorug' va qorong'u mavzu o'rtasida almashtirish")
 
-        # ── Rejim tanlash ─────────────────────────────────────────────────
-        mode_frame = tb.LabelFrame(self, text="⚡ REJA", padding=6)
-        mode_frame.pack(fill=X, **pad)
+        tb.Separator(self, bootstyle="secondary").pack(fill=X)
+
+    # ── Chap ustun: rejim, yo'nalish, filtrlar ──────────────────────────────────
+
+    def _build_mode_section(self, parent) -> None:
+        frame = tb.Labelframe(parent, text="  ⚡  Ish rejimi  ", padding=10)
+        frame.pack(fill=X, pady=(0, 8))
+
         self._mode_var = tk.StringVar(value="once")
-        tb.Radiobutton(mode_frame, text="Bir martalik yuklash",
-                       variable=self._mode_var, value="once",
-                       bootstyle="primary").pack(side=LEFT, padx=12)
-        tb.Radiobutton(mode_frame, text="Monitoring rejimi (Avto-yangilash)",
-                       variable=self._mode_var, value="monitor",
-                       bootstyle="success").pack(side=LEFT, padx=12)
+        rb1 = tb.Radiobutton(
+            frame, text="Bir martalik yuklash",
+            variable=self._mode_var, value="once", bootstyle="primary",
+        )
+        rb1.pack(anchor="w", pady=3)
+        add_tooltip(rb1, "Tanlangan yo'nalishlardagi barcha mavjud hujjatlarni "
+                         "bir marta yuklab oladi va to'xtaydi.")
 
-        # ── Yo'nalishlar ──────────────────────────────────────────────────
-        ct_frame = tb.LabelFrame(self, text="📂 YO'NALISH (bir yoki bir necha tanlang)", padding=6)
-        ct_frame.pack(fill=X, **pad)
+        rb2 = tb.Radiobutton(
+            frame, text="Monitoring (avtomatik kuzatuv)",
+            variable=self._mode_var, value="monitor", bootstyle="success",
+        )
+        rb2.pack(anchor="w", pady=3)
+        add_tooltip(rb2, "Belgilangan vaqt oralig'ida saytni kuzatib turadi va "
+                         "yangi hujjat chiqishi bilan avtomatik yuklab oladi.")
+
+    def _build_court_section(self, parent) -> None:
+        frame = tb.Labelframe(parent, text="  📂  Sud yo'nalishlari  ", padding=10)
+        frame.pack(fill=X, pady=8)
+        tb.Label(
+            frame, text="Kamida bittasini tanlang:",
+            font=("Segoe UI", 9), bootstyle="secondary",
+        ).pack(anchor="w", pady=(0, 4))
+
         self._ct_vars: dict[str, tk.BooleanVar] = {}
-        row1 = tb.Frame(ct_frame); row1.pack(fill=X)
-        row2 = tb.Frame(ct_frame); row2.pack(fill=X)
-        items = list(COURT_TYPES.items())
-        for i, (code, label) in enumerate(items):
+        for code, label in COURT_TYPES.items():
             var = tk.BooleanVar(value=(code == "ECONOMIC"))
             self._ct_vars[code] = var
-            row = row1 if i < 3 else row2
-            tb.Checkbutton(row, text=label, variable=var,
-                           bootstyle="primary-round-toggle").pack(side=LEFT, padx=8, pady=2)
+            tb.Checkbutton(
+                frame, text=label, variable=var,
+                bootstyle="primary-round-toggle",
+            ).pack(anchor="w", padx=4, pady=2)
 
-        # ── Filtrlar ──────────────────────────────────────────────────────
-        flt_frame = tb.LabelFrame(self, text="🔍 FILTRLAR (ixtiyoriy)", padding=6)
-        flt_frame.pack(fill=X, **pad)
+    def _build_filter_section(self, parent) -> None:
+        frame = tb.Labelframe(parent, text="  🔍  Filtrlar (ixtiyoriy)  ", padding=10)
+        frame.pack(fill=X, pady=8)
 
-        row_a = tb.Frame(flt_frame); row_a.pack(fill=X, pady=2)
-        tb.Label(row_a, text="Hujjat turi:", width=14, anchor="w").pack(side=LEFT)
+        # Hujjat turi
+        tb.Label(frame, text="Hujjat turi", font=("Segoe UI", 9),
+                 bootstyle="secondary").pack(anchor="w")
         self._type_var = tk.StringVar()
-        self._type_cb  = tb.Combobox(row_a, textvariable=self._type_var, width=24, state="readonly")
+        self._type_cb = tb.Combobox(frame, textvariable=self._type_var, state="readonly")
         self._type_cb["values"] = [d["name"] for d in DEFAULT_DOC_TYPES]
         self._type_cb.set(DEFAULT_DOC_TYPES[0]["name"])
-        self._type_cb.pack(side=LEFT, padx=(0, 20))
+        self._type_cb.pack(fill=X, pady=(0, 6))
 
-        tb.Label(row_a, text="Instansiya:", width=12, anchor="w").pack(side=LEFT)
+        # Instansiya
+        tb.Label(frame, text="Instansiya", font=("Segoe UI", 9),
+                 bootstyle="secondary").pack(anchor="w")
         self._inst_var = tk.StringVar()
-        inst_cb = tb.Combobox(row_a, textvariable=self._inst_var, width=22, state="readonly")
-        inst_cb["values"] = list(INSTANCE_TYPES.values())
-        inst_cb.set(list(INSTANCE_TYPES.values())[0])
-        inst_cb.pack(side=LEFT)
-        self._inst_cb = inst_cb
+        self._inst_cb = tb.Combobox(frame, textvariable=self._inst_var, state="readonly")
+        self._inst_cb["values"] = list(INSTANCE_TYPES.values())
+        self._inst_cb.set(list(INSTANCE_TYPES.values())[0])
+        self._inst_cb.pack(fill=X, pady=(0, 6))
 
-        row_b = tb.Frame(flt_frame); row_b.pack(fill=X, pady=2)
-        tb.Label(row_b, text="Sana (dan):", width=14, anchor="w").pack(side=LEFT)
-        self._date_from = DateEntry(row_b)
-        self._date_from.pack(side=LEFT, padx=(0, 20))
-        tb.Label(row_b, text="(gacha):", width=10, anchor="w").pack(side=LEFT)
-        self._date_to = DateEntry(row_b)
-        self._date_to.pack(side=LEFT, padx=(0, 20))
-        tb.Label(row_b, text="Ish raqami:", width=12, anchor="w").pack(side=LEFT)
+        # Sana oralig'i
+        date_row = tb.Frame(frame)
+        date_row.pack(fill=X, pady=(0, 6))
+        col_from = tb.Frame(date_row); col_from.pack(side=LEFT, expand=True, fill=X)
+        tb.Label(col_from, text="Sana (dan)", font=("Segoe UI", 9),
+                 bootstyle="secondary").pack(anchor="w")
+        self._date_from = DateEntry(col_from)
+        self._date_from.pack(anchor="w")
+        col_to = tb.Frame(date_row); col_to.pack(side=LEFT, expand=True, fill=X)
+        tb.Label(col_to, text="Sana (gacha)", font=("Segoe UI", 9),
+                 bootstyle="secondary").pack(anchor="w")
+        self._date_to = DateEntry(col_to)
+        self._date_to.pack(anchor="w")
+
+        # Ish raqami
+        tb.Label(frame, text="Ish raqami", font=("Segoe UI", 9),
+                 bootstyle="secondary").pack(anchor="w")
         self._case_var = tk.StringVar()
-        tb.Entry(row_b, textvariable=self._case_var, width=16).pack(side=LEFT)
+        case_entry = tb.Entry(frame, textvariable=self._case_var)
+        case_entry.pack(fill=X)
+        add_tooltip(case_entry, "Aniq ish raqami bo'yicha qidirish (masalan: 4-1901/2024).")
 
-        # ── Saqlash joyi ──────────────────────────────────────────────────
-        path_frame = tb.LabelFrame(self, text="💾 SAQLASH JOYI", padding=6)
-        path_frame.pack(fill=X, **pad)
+    # ── O'ng ustun: saqlash joyi, sozlamalar, statistika ────────────────────────
+
+    def _build_path_section(self, parent) -> None:
+        frame = tb.Labelframe(parent, text="  💾  Saqlash joyi  ", padding=10)
+        frame.pack(fill=X, pady=(0, 8))
         self._path_var = tk.StringVar(value=self.config.download_path)
-        tb.Entry(path_frame, textvariable=self._path_var, width=60).pack(side=LEFT, fill=X, expand=True)
-        tb.Button(path_frame, text="📁 Ko'rish", command=self._browse_path,
-                  bootstyle="secondary-outline", width=10).pack(side=LEFT, padx=6)
+        row = tb.Frame(frame); row.pack(fill=X)
+        entry = tb.Entry(row, textvariable=self._path_var)
+        entry.pack(side=LEFT, fill=X, expand=True)
+        add_tooltip(entry, "Yuklab olingan PDF fayllar shu papkaga saqlanadi.")
+        tb.Button(row, text="📁", command=self._browse_path,
+                  bootstyle="secondary-outline", width=4).pack(side=LEFT, padx=(6, 0))
 
-        # ── Sozlamalar ────────────────────────────────────────────────────
-        cfg_frame = tb.LabelFrame(self, text="⚙️  SOZLAMALAR", padding=6)
-        cfg_frame.pack(fill=X, **pad)
-        row_c = tb.Frame(cfg_frame); row_c.pack(fill=X, pady=2)
-        tb.Label(row_c, text="Bir vaqtdagi yuklamalar:", width=24, anchor="w").pack(side=LEFT)
+    def _build_settings_section(self, parent) -> None:
+        frame = tb.Labelframe(parent, text="  ⚙️  Sozlamalar  ", padding=10)
+        frame.pack(fill=X, pady=8)
+
+        # Bir vaqtdagi yuklamalar
+        r1 = tb.Frame(frame); r1.pack(fill=X, pady=3)
+        tb.Label(r1, text="Bir vaqtda yuklash (oqim)", anchor="w").pack(side=LEFT, fill=X, expand=True)
         self._workers_var = tk.IntVar(value=self.config.max_workers)
-        tb.Spinbox(row_c, from_=1, to=20, textvariable=self._workers_var, width=5).pack(side=LEFT, padx=(0, 20))
-        tb.Label(row_c, text="So'rovlar oralig'i (s):", width=22, anchor="w").pack(side=LEFT)
+        sp1 = tb.Spinbox(r1, from_=1, to=20, textvariable=self._workers_var, width=6)
+        sp1.pack(side=RIGHT)
+        add_tooltip(sp1, "Bir vaqtning o'zida nechta fayl yuklansin. Ko'p bo'lsa tezroq, "
+                         "lekin saytga yuk ko'proq tushadi (tavsiya: 5).")
+
+        # So'rovlar oralig'i
+        r2 = tb.Frame(frame); r2.pack(fill=X, pady=3)
+        tb.Label(r2, text="So'rovlar oralig'i (soniya)", anchor="w").pack(side=LEFT, fill=X, expand=True)
         self._delay_var = tk.DoubleVar(value=self.config.request_delay)
-        tb.Spinbox(row_c, from_=0, to=10, increment=0.1, textvariable=self._delay_var,
-                   format="%.1f", width=6).pack(side=LEFT)
+        sp2 = tb.Spinbox(r2, from_=0, to=10, increment=0.1,
+                         textvariable=self._delay_var, format="%.1f", width=6)
+        sp2.pack(side=RIGHT)
+        add_tooltip(sp2, "Har so'rov orasidagi tanaffus. 429 (Too Many Requests) "
+                         "xatosi chiqsa, qiymatni oshiring.")
 
-        row_d = tb.Frame(cfg_frame); row_d.pack(fill=X, pady=2)
-        tb.Label(row_d, text="Monitoring: tekshirish oralig'i (daqiqa):", width=36, anchor="w").pack(side=LEFT)
+        # Monitoring oralig'i
+        r3 = tb.Frame(frame); r3.pack(fill=X, pady=3)
+        tb.Label(r3, text="Monitoring oralig'i (daqiqa)", anchor="w").pack(side=LEFT, fill=X, expand=True)
         self._interval_var = tk.IntVar(value=self.config.monitor_interval_minutes)
-        tb.Spinbox(row_d, from_=1, to=1440, textvariable=self._interval_var, width=6).pack(side=LEFT, padx=(0, 20))
+        sp3 = tb.Spinbox(r3, from_=1, to=1440, textvariable=self._interval_var, width=6)
+        sp3.pack(side=RIGHT)
+        add_tooltip(sp3, "Monitoring rejimida saytni qancha vaqtda bir tekshirish.")
+
+        # Mavjud fayllarni o'tkazib yuborish
         self._skip_var2 = tk.BooleanVar(value=self.config.skip_existing)
-        tb.Checkbutton(row_d, text="Mavjud fayllarni o'tkazib yubor",
-                       variable=self._skip_var2, bootstyle="primary").pack(side=LEFT)
+        chk = tb.Checkbutton(frame, text="Mavjud fayllarni o'tkazib yubor",
+                             variable=self._skip_var2, bootstyle="primary-round-toggle")
+        chk.pack(anchor="w", pady=(6, 0))
+        add_tooltip(chk, "Allaqachon yuklab olingan fayllar qayta yuklanmaydi.")
 
-        # ── Tugmalar ──────────────────────────────────────────────────────
-        btn_frame = tb.Frame(self)
-        btn_frame.pack(fill=X, **pad)
-        self._btn_start = tb.Button(btn_frame, text="▶ YUKLAB OLISHNI BOSHLASH",
-                                    command=self._start_download,
-                                    bootstyle="primary", width=26)
-        self._btn_start.pack(side=LEFT, padx=4)
-        self._btn_monitor = tb.Button(btn_frame, text="📡 MONITORINGNI YOQISH",
-                                      command=self._start_monitor,
-                                      bootstyle="success", width=24)
-        self._btn_monitor.pack(side=LEFT, padx=4)
-        self._btn_stop = tb.Button(btn_frame, text="⏹ TO'XTATISH",
-                                   command=self._stop_all,
-                                   bootstyle="danger", width=14, state="disabled")
-        self._btn_stop.pack(side=LEFT, padx=4)
+    def _build_stats_section(self, parent) -> None:
+        frame = tb.Labelframe(parent, text="  📊  Statistika  ", padding=10)
+        frame.pack(fill=BOTH, expand=True, pady=8)
+        row = tb.Frame(frame); row.pack(fill=X)
 
-        # ── Progress ──────────────────────────────────────────────────────
-        prog_frame = tb.LabelFrame(self, text="PROGRESS", padding=6)
-        prog_frame.pack(fill=X, **pad)
+        self._card_success = StatCard(row, "Yuklandi", "0", bootstyle="success")
+        self._card_success.pack(side=LEFT, fill=X, expand=True)
+        self._card_failed = StatCard(row, "Xato", "0", bootstyle="danger")
+        self._card_failed.pack(side=LEFT, fill=X, expand=True)
+        self._card_total = StatCard(row, "Bazada jami", str(self.state.total_count()),
+                                    bootstyle="info")
+        self._card_total.pack(side=LEFT, fill=X, expand=True)
+
+    # ── Amal tugmalari ──────────────────────────────────────────────────────────
+
+    def _build_action_buttons(self) -> None:
+        btn_frame = tb.Frame(self, padding=(12, 4))
+        btn_frame.pack(fill=X)
+
+        self._btn_start = tb.Button(
+            btn_frame, text="▶   Yuklab olishni boshlash",
+            command=self._start_download, bootstyle="primary",
+        )
+        self._btn_start.pack(side=LEFT, fill=X, expand=True, padx=(0, 4), ipady=4)
+        add_tooltip(self._btn_start, "Tanlangan yo'nalishlardagi hujjatlarni bir marta yuklaydi.")
+
+        self._btn_monitor = tb.Button(
+            btn_frame, text="📡   Monitoringni yoqish",
+            command=self._start_monitor, bootstyle="success",
+        )
+        self._btn_monitor.pack(side=LEFT, fill=X, expand=True, padx=4, ipady=4)
+        add_tooltip(self._btn_monitor, "Yangi hujjatlarni avtomatik kuzatishni boshlaydi.")
+
+        self._btn_stop = tb.Button(
+            btn_frame, text="⏹   To'xtatish",
+            command=self._stop_all, bootstyle="danger", state="disabled",
+        )
+        self._btn_stop.pack(side=LEFT, fill=X, expand=True, padx=(4, 0), ipady=4)
+        add_tooltip(self._btn_stop, "Joriy yuklash yoki monitoringni to'xtatadi.")
+
+    # ── Progress + Log ────────────────────────────────────────────────────────
+
+    def _build_progress_and_log(self) -> None:
+        prog_frame = tb.Frame(self, padding=(12, 4))
+        prog_frame.pack(fill=X)
         self._progressbar = ProgressBar(prog_frame)
         self._progressbar.pack(fill=X)
-        self._status_var = tk.StringVar(value="Tayyor")
-        tb.Label(prog_frame, textvariable=self._status_var,
-                 bootstyle="info", anchor="w").pack(fill=X)
 
-        # ── Log ───────────────────────────────────────────────────────────
-        log_frame = tb.LabelFrame(self, text="📋 LOG", padding=4)
-        log_frame.pack(fill=BOTH, expand=True, **pad)
+        log_frame = tb.Labelframe(self, text="  📋  Jarayon jurnali  ", padding=8)
+        log_frame.pack(fill=BOTH, expand=True, padx=12, pady=(4, 8))
+
         btn_log_row = tb.Frame(log_frame)
-        btn_log_row.pack(fill=X)
-        tb.Button(btn_log_row, text="📂 Papkani Ochish",
-                  command=self._open_folder,   bootstyle="info-outline",  width=18).pack(side=LEFT, padx=4)
-        tb.Button(btn_log_row, text="📊 CSV Hisobot",
-                  command=self._open_csv_log,  bootstyle="warning-outline", width=14).pack(side=LEFT, padx=4)
-        tb.Button(btn_log_row, text="🗑 Tozala",
-                  command=lambda: self._log.clear(), bootstyle="secondary-outline", width=10).pack(side=RIGHT, padx=4)
-        self._log = ScrolledLog(log_frame, height=12)
-        self._log.pack(fill=BOTH, expand=True, pady=(4, 0))
+        btn_log_row.pack(fill=X, pady=(0, 4))
+        b1 = tb.Button(btn_log_row, text="📂  Papkani ochish",
+                       command=self._open_folder, bootstyle="info-outline")
+        b1.pack(side=LEFT, padx=(0, 4))
+        add_tooltip(b1, "Yuklab olingan fayllar papkasini fayl menejerida ochadi.")
+        b2 = tb.Button(btn_log_row, text="📊  CSV hisobot",
+                       command=self._open_csv_log, bootstyle="warning-outline")
+        b2.pack(side=LEFT, padx=4)
+        add_tooltip(b2, "Eng so'nggi yuklash hisobotini (CSV) ochadi.")
+        b3 = tb.Button(btn_log_row, text="🗑  Tozalash",
+                       command=lambda: self._log.clear(), bootstyle="secondary-outline")
+        b3.pack(side=RIGHT)
+        add_tooltip(b3, "Jurnal oynasini tozalaydi (fayllarga ta'sir qilmaydi).")
+
+        self._log = ScrolledLog(log_frame, height=10)
+        self._log.pack(fill=BOTH, expand=True)
+
+    # ── Pastki holat paneli ─────────────────────────────────────────────────────
+
+    def _build_statusbar(self) -> None:
+        tb.Separator(self, bootstyle="secondary").pack(fill=X)
+        bar = tb.Frame(self, padding=(12, 5))
+        bar.pack(fill=X)
+        self._status_var = tk.StringVar(value="✅ Tayyor — yo'nalish tanlab, boshlang")
+        tb.Label(bar, textvariable=self._status_var, bootstyle="secondary",
+                 anchor="w").pack(side=LEFT, fill=X, expand=True)
+        tb.Label(bar, text=f"{self.APP_TITLE.split('—')[0].strip()} {self.APP_VERSION}",
+                 bootstyle="secondary", anchor="e").pack(side=RIGHT)
 
     # ─────────────────────────────────────────────────────────────────────────
     # GUI YORDAMCHI METODLAR
@@ -242,7 +396,22 @@ class SudParserApp(tb.Window):
         self._stat_failed  += failed
         self._stat_skipped += skipped
         s, f, sk, t = self._stat_success, self._stat_failed, self._stat_skipped, self._stat_total
-        self.after(0, lambda: self._progressbar.update(s, f, sk, t))
+
+        def _apply():
+            self._progressbar.update(s, f, sk, t)
+            self._card_success.set(s)
+            self._card_failed.set(f)
+            self._card_total.set(self.state.total_count())
+        self.after(0, _apply)
+
+    def _toggle_theme(self) -> None:
+        """Yorug' va qorong'u mavzu o'rtasida almashtirish"""
+        new_theme = "flatly" if self._theme_var.get() == "darkly" else "darkly"
+        self._theme_var.set(new_theme)
+        try:
+            self.style.theme_use(new_theme)
+        except Exception:
+            pass
 
     def _get_selected_court_types(self) -> list[str]:
         return [code for code, var in self._ct_vars.items() if var.get()]
@@ -279,7 +448,8 @@ class SudParserApp(tb.Window):
 
     def _apply_settings(self) -> None:
         """Sozlamalarni config ga qo'llash"""
-        self.config.download_path = self._path_var.get() or "./Sud_Hujjatlari"
+        from config import default_download_path
+        self.config.download_path = self._path_var.get() or default_download_path()
         self.config.max_workers   = max(1, self._workers_var.get())
         self.config.request_delay = max(0.0, self._delay_var.get())
         self.config.skip_existing = self._skip_var2.get()
@@ -296,13 +466,13 @@ class SudParserApp(tb.Window):
     def _open_folder(self) -> None:
         path = Path(self._path_var.get())
         ensure_dir(path)
-        os.startfile(str(path))
+        open_path(str(path))
 
     def _open_csv_log(self) -> None:
         import glob
         files = sorted(glob.glob("logs/download_log_*.csv"), reverse=True)
         if files:
-            os.startfile(files[0])
+            open_path(files[0])
         else:
             messagebox.showinfo("Ma'lumot", "CSV log fayli topilmadi.")
 
@@ -314,6 +484,12 @@ class SudParserApp(tb.Window):
     def _reset_stats(self) -> None:
         self._stat_success = self._stat_failed = self._stat_skipped = self._stat_total = 0
         self._progressbar.reset()
+        try:
+            self._card_success.set(0)
+            self._card_failed.set(0)
+            self._card_total.set(self.state.total_count())
+        except Exception:
+            pass
 
     # ─────────────────────────────────────────────────────────────────────────
     # AMALLAR

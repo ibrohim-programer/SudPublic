@@ -3,6 +3,7 @@
 
 import requests
 import time
+import json
 from typing import Iterator, Optional
 from .models import Publication, PublicationsResponse, PublicationType, Attachment, FileData
 from .endpoints import BASE_URL, PUBLICATIONS_URL, TYPES_URL, CATEGORY_URL
@@ -35,12 +36,12 @@ class SudApiClient:
     def get_types(self) -> list[dict]:
         """Hujjat turlarini olish (/types)"""
         r = self._get(TYPES_URL)
-        return r.json()
+        return self._unwrap(r.json())
 
     def get_categories(self) -> list[dict]:
         """Kategoriyalarni olish (/category)"""
-        r = self._get(f"{BASE_URL}/category")
-        return r.json()
+        r = self._get(CATEGORY_URL)
+        return self._unwrap(r.json())
 
     def fetch_page(
         self,
@@ -76,7 +77,7 @@ class SudApiClient:
             params["instanceType"] = instance_type.strip()
 
         r = self._get(PUBLICATIONS_URL, params=params)
-        return self._parse_response(r.json())
+        return self._parse_response(self._unwrap(r.json()))
 
     def iter_all_pages(
         self,
@@ -109,10 +110,27 @@ class SudApiClient:
 
     def download_file_bytes(self, file_id: int) -> bytes:
         """PDF faylni bytes sifatida yuklab olish"""
-        r = self._get(f"{BASE_URL}/file/{file_id}", stream=True, timeout=60)
+        r = self._get(f"{BASE_URL}/api/file/download/{file_id}", stream=True, timeout=60)
         return r.content
 
     # ─── Ichki yordamchi metodlar ────────────────────────────────────────────
+
+    @staticmethod
+    def _unwrap(payload):
+        """
+        API javobini "data" o'ramidan ochadi.
+        Yangi API barcha javobni {"data": "<JSON satr>"} ko'rinishida qaytaradi.
+        Eski format (to'g'ridan-to'g'ri dict/list) ham qo'llab-quvvatlanadi.
+        """
+        if isinstance(payload, dict) and "data" in payload and len(payload) == 1:
+            inner = payload["data"]
+            if isinstance(inner, str):
+                try:
+                    return json.loads(inner)
+                except (ValueError, TypeError):
+                    return inner
+            return inner
+        return payload
 
     def _get(
         self,
@@ -152,6 +170,12 @@ class SudApiClient:
                 if attempt == _retries - 1:
                     raise
                 time.sleep(2 ** attempt)
+
+            except requests.ConnectionError:
+                # Ulanish rad etildi / vaqtincha uzildi — kutib qayta urinamiz
+                if attempt == _retries - 1:
+                    raise
+                time.sleep(3 * (attempt + 1))
 
             except requests.HTTPError:
                 if r.status_code in (400, 404):

@@ -57,7 +57,7 @@ class Publication:
         """Yuklab olish URL si"""
         f = self.primary_file
         if f:
-            return f"https://publication.sud.uz/file/{f.id}"
+            return f"https://publication.sud.uz/api/file/download/{f.id}"
         return None
 
     @property

@@ -1,0 +1,11 @@
+=== SudParser Sessiya Xulosasi ===
+Boshlanish vaqti : 2026-06-07 16:20:22
+Davomiyligi       : 0:01:19
+Ish rejimi        : bir_martalik
+Yo'nalishlar      : ECONOMIC, ECONOMIC_OLD, ADMINISTRATIVE, CIVIL, CRIMINAL, ADMINISTRATIVE_OFFENCE
+Jami tekshiruv    : 0
+Yangi topilgan    : 0
+Muvaffaqiyatli    : 21
+O'tkazib yuborildi: 0
+Xatolik           : 9
+Umumiy hajm       : 5.83 MB

@@ -8,6 +8,91 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 
 
+class Tooltip:
+    """
+    Vidjet ustiga sichqoncha kelganda chiqadigan kichik yordam oynasi.
+    Foydalanuvchi har bir sozlama nima qilishini darhol tushunadi.
+    """
+
+    def __init__(self, widget, text: str, delay: int = 450):
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self._tip: Optional[tk.Toplevel] = None
+        self._after_id: Optional[str] = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, _event=None):
+        self._cancel()
+        self._after_id = self.widget.after(self.delay, self._show)
+
+    def _cancel(self):
+        if self._after_id:
+            self.widget.after_cancel(self._after_id)
+            self._after_id = None
+
+    def _show(self):
+        if self._tip or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 16
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        self._tip = tk.Toplevel(self.widget)
+        self._tip.wm_overrideredirect(True)
+        self._tip.wm_geometry(f"+{x}+{y}")
+        lbl = tk.Label(
+            self._tip,
+            text=self.text,
+            justify="left",
+            background="#11111b",
+            foreground="#cdd6f4",
+            relief="solid",
+            borderwidth=1,
+            font=("Segoe UI", 9),
+            padx=8,
+            pady=5,
+            wraplength=320,
+        )
+        lbl.pack()
+
+    def _hide(self, _event=None):
+        self._cancel()
+        if self._tip:
+            self._tip.destroy()
+            self._tip = None
+
+
+def add_tooltip(widget, text: str) -> Tooltip:
+    """Qisqa yordamchi: vidjetga tooltip biriktirish"""
+    return Tooltip(widget, text)
+
+
+class StatCard(tb.Frame):
+    """
+    Bitta statistika kartasi: katta raqam + ostida izoh.
+    Masalan: "128 \n Yuklab olindi".
+    """
+
+    def __init__(self, parent, title: str, value: str = "0",
+                 bootstyle: str = "secondary", **kw):
+        super().__init__(parent, padding=10, **kw)
+        self._value_var = tk.StringVar(value=value)
+        self._value_lbl = tb.Label(
+            self, textvariable=self._value_var,
+            font=("Segoe UI", 20, "bold"), bootstyle=bootstyle,
+            anchor="center",
+        )
+        self._value_lbl.pack(fill=X)
+        tb.Label(
+            self, text=title, font=("Segoe UI", 9),
+            bootstyle="secondary", anchor="center",
+        ).pack(fill=X)
+
+    def set(self, value) -> None:
+        self._value_var.set(str(value))
+
+
 class LabeledEntry(tb.Frame):
     """Label + Entry birlashgan widget"""
 
@@ -42,44 +127,69 @@ class LabeledEntry(tb.Frame):
 
 
 class DateEntry(tb.Frame):
-    """Sana kiritish uchun DD.MM.YYYY formatli widget"""
+    """
+    Kalendardan sana tanlash widgeti (qo'lda yozilmaydi).
+    📅 tugmasi kalendar oynasini ochadi, ✕ tugmasi tanlovni tozalaydi.
+    Sana ixtiyoriy — tanlanmasa filtr qo'llanmaydi.
+    """
 
-    PLACEHOLDER = "DD.MM.YYYY"
+    PLACEHOLDER = "kun.oy.yil"
 
     def __init__(self, parent, label: str = "", **kw):
         super().__init__(parent, **kw)
+        self._date = None  # datetime.date yoki None
+
         if label:
             tb.Label(self, text=label, width=12, anchor="w").pack(side=LEFT, padx=(0, 4))
+
         self.var = tk.StringVar(value=self.PLACEHOLDER)
-        self.entry = tb.Entry(self, textvariable=self.var, width=12)
+        self.entry = tb.Entry(self, textvariable=self.var, width=11, state="readonly")
         self.entry.pack(side=LEFT)
-        self.entry.bind("<FocusIn>",  self._on_in)
-        self.entry.bind("<FocusOut>", self._on_out)
 
-    def _on_in(self, e):
-        if self.var.get() == self.PLACEHOLDER:
-            self.var.set("")
-            self.entry.config(foreground="")
+        self._btn_pick = tb.Button(
+            self, text="📅", width=3, bootstyle="secondary-outline",
+            command=self._pick_date, takefocus=False,
+        )
+        self._btn_pick.pack(side=LEFT, padx=(3, 0))
 
-    def _on_out(self, e):
-        if not self.var.get():
-            self.var.set(self.PLACEHOLDER)
-            self.entry.config(foreground="gray")
+        self._btn_clear = tb.Button(
+            self, text="✕", width=2, bootstyle="secondary-outline",
+            command=self.clear, takefocus=False,
+        )
+        self._btn_clear.pack(side=LEFT, padx=(2, 0))
+
+    def _pick_date(self) -> None:
+        """Kalendar oynasini ochib, tanlangan sanani saqlash"""
+        from ttkbootstrap.dialogs import Querybox
+        try:
+            selected = Querybox.get_date(
+                parent=self,
+                title="Sanani tanlang",
+                startdate=self._date,
+                bootstyle="primary",
+            )
+        except Exception:
+            return
+        if selected:
+            self._date = selected
+            self.var.set(selected.strftime("%d.%m.%Y"))
+
+    def clear(self) -> None:
+        """Tanlangan sanani bekor qilish"""
+        self._date = None
+        self.var.set(self.PLACEHOLDER)
 
     def get_ms(self) -> Optional[int]:
-        """Sanani Unix ms ga aylantirish; to'ldirilmasa None qaytaradi"""
-        val = self.var.get().strip()
-        if val == self.PLACEHOLDER or not val:
+        """Tanlangan sanani Unix ms ga aylantirish; tanlanmasa None"""
+        if not self._date:
             return None
-        from utils import date_to_timestamp
-        try:
-            return date_to_timestamp(val)
-        except ValueError:
-            return None
+        import datetime
+        dt = datetime.datetime(self._date.year, self._date.month, self._date.day)
+        return int(dt.timestamp() * 1000)
 
     def get(self) -> str:
-        val = self.var.get().strip()
-        return "" if val == self.PLACEHOLDER else val
+        """Tanlangan sana matni (DD.MM.YYYY) yoki bo'sh satr"""
+        return "" if not self._date else self._date.strftime("%d.%m.%Y")
 
 
 class ScrolledLog(tb.Frame):

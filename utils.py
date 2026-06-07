@@ -4,7 +4,29 @@
 import datetime
 import os
 import sys
+import subprocess
 from pathlib import Path
+
+
+def open_path(path: str | Path) -> None:
+    """
+    Fayl yoki papkani tizimning standart dasturida ochish.
+    Cross-platform: Windows, Linux va macOS da ishlaydi.
+
+    - Windows → os.startfile
+    - macOS   → open
+    - Linux   → xdg-open
+    """
+    path_str = str(path)
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(path_str)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path_str])
+        else:
+            subprocess.Popen(["xdg-open", path_str])
+    except Exception:
+        pass
 
 
 def date_to_timestamp(date_str: str) -> int:
@@ -47,6 +69,23 @@ def get_resource_path(relative_path: str) -> str:
         # Oddiy Python muhit
         base_path = Path(__file__).parent
     return str(base_path / relative_path)
+
+
+def is_frozen() -> bool:
+    """Dastur PyInstaller bilan paketlanganmi (SUDPUBLIK.exe / SUDPUBLIK)?"""
+    return getattr(sys, "frozen", False) or hasattr(sys, "_MEIPASS")
+
+
+def get_app_data_dir() -> Path:
+    """
+    Dastur ma'lumotlari (config, log, state) saqlanadigan papka.
+    Har doim foydalanuvchi yoza oladigan joyda — shuning uchun SUDPUBLIK ni
+    istalgan papkaga qo'yib ishlatish mumkin (boshqa foydalanuvchida ham).
+    Misol: /home/<user>/Documents/SUDPUBLIK
+    """
+    base = Path.home() / "Documents" / "SUDPUBLIK"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
 
 def ensure_dir(path: str | Path) -> Path:

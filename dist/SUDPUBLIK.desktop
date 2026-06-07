@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SUDPUBLIK
+Comment=Sud hujjatlarini avtomatik yuklab oluvchi
+Exec=/home/ubuntu/Documents/Loyxalar/SudPublik/dist/SUDPUBLIK
+Icon=/home/ubuntu/Documents/Loyxalar/SudPublik/assets/icon.png
+Terminal=false
+Categories=Utility;Office;

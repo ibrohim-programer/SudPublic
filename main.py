@@ -1,18 +1,22 @@
 # main.py — Dastur kirish nuqtasi
-# SudParser v3.0 | python main.py yoki SudParser.exe
+# SUDPUBLIK | python main.py  yoki  SUDPUBLIK(.exe)
 
 import sys
 import os
+from pathlib import Path
 
 
 def main():
-    """SudParser GUI ni ishga tushirish"""
-    # PyInstaller muhitida current directory ni to'g'rilash
-    if hasattr(sys, "_MEIPASS"):
-        os.chdir(os.path.dirname(sys.executable))
+    """SUDPUBLIK GUI ni ishga tushirish"""
+    from utils import is_frozen, get_app_data_dir
+
+    # Paketlangan (SUDPUBLIK.exe) holatda — ma'lumotlarni foydalanuvchining
+    # yoziladigan papkasiga saqlaymiz. Shunda binarni istalgan joyga qo'yib
+    # ishlatish mumkin (boshqa foydalanuvchida ham).
+    if is_frozen():
+        os.chdir(str(get_app_data_dir()))
 
     # Loglar papkasini yaratish
-    from pathlib import Path
     Path("logs").mkdir(exist_ok=True)
 
     # Dasturni ishga tushirish

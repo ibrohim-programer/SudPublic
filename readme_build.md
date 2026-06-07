@@ -1,11 +1,11 @@
 # SudParser — Dasturchi uchun Qo'llanma (README_BUILD.md)
 
 ## Loyiha haqida
-`SudParser` — **publication.sud.uz** ochiq portalidan sud hujjatlarini (PDF) avtomatik yuklab oluvchi Windows dastur.
+`SudParser` — **publication.sud.uz** ochiq portalidan sud hujjatlarini (PDF) avtomatik yuklab oluvchi **cross-platform** dastur (Windows va Linux/Ubuntu).
 
 - **REST API** orqali ishlaydi (Selenium kerak emas)
 - Real-time **monitoring rejimi** — yangi hujjatlar tushishi bilan avtomatik yuklab oladi
-- **PyInstaller** bilan `.exe` paketlanadi
+- **PyInstaller** bilan `.exe` (Windows) yoki binar (Linux) paketlanadi
 
 ---
 
@@ -15,11 +15,13 @@
 |--------|---------|
 | Python | 3.10+ (3.11 yoki 3.12 tavsiya) |
 | pip    | 22+    |
-| OS     | Windows 10/11 (64-bit) |
+| OS     | Windows 10/11 (64-bit) **yoki** Ubuntu 20.04+ / boshqa Linux |
 
 ---
 
 ## O'rnatish va ishga tushirish (dasturchiga)
+
+### Windows
 
 ```bash
 # 1. Loyihani yuklab oling
@@ -37,35 +39,69 @@ pip install -r requirements.txt
 python main.py
 ```
 
+### Linux / Ubuntu
+
+```bash
+# 1. Tizim paketlari (tkinter + tray uchun)
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip python3-tk \
+                    gir1.2-appindicator3-0.1     # tray ikonkasi uchun (ixtiyoriy)
+
+# 2. Loyihani yuklab oling
+git clone <repo_url>
+cd sudparser
+
+# 3. Virtual muhit yarating
+python3 -m venv venv
+source venv/bin/activate
+
+# 4. Kutubxonalarni o'rnating
+pip install -r requirements.txt
+
+# 5. Dasturni ishga tushiring
+python3 main.py
+```
+
+> **Eslatma (Linux):** `python3-tk` o'rnatilmagan bo'lsa GUI ishga tushmaydi.
+> Tray ikonkasi ko'rinmasa `gir1.2-appindicator3-0.1` paketini o'rnating —
+> bu bo'lmasa ham dastur ishlaydi, faqat tray menyusi bo'lmaydi.
+
 ---
 
-## EXE yaratish
+## EXE / Binar yaratish
+
+`build.spec` allaqachon sozlangan — u **SUDPUBLIK** ijro etiluvchi faylini yaratadi
+(lokal modullar, assets, ttkbootstrap/pystray va PIL._tkinter_finder avtomatik qo'shiladi).
+
+### Linux (binar) — Ubuntu
 
 ```bash
-# Virtual muhit faol bo'lsin
-venv\Scripts\activate
-
-# PyInstaller o'rnating (agar yo'q bo'lsa)
+source .venv/bin/activate
 pip install pyinstaller
 
-# EXE yaratish (build.spec orqali)
-pyinstaller build.spec
+pyinstaller build.spec --noconfirm
 
-# Natija: dist/SudParser.exe
+# Natija: dist/SUDPUBLIK   (ELF ijro etiluvchi)
+chmod +x dist/SUDPUBLIK
+./dist/SUDPUBLIK
 ```
 
-### Muqobil (qo'lda buyruq bilan):
+Ish stolidan ochish uchun `dist/SUDPUBLIK.desktop` yorlig'ini ishlatishingiz mumkin
+(Exec va Icon yo'llarini o'z papkangizga moslang).
+
+### Windows (.exe)
+
 ```bash
-pyinstaller --onefile --windowed ^
-            --icon=assets/icon.ico ^
-            --name=SudParser ^
-            --add-data="assets;assets" ^
-            --hidden-import=ttkbootstrap ^
-            --hidden-import=pystray ^
-            --collect-all=ttkbootstrap ^
-            --collect-all=pystray ^
-            main.py
+venv\Scripts\activate
+pip install pyinstaller
+
+pyinstaller build.spec --noconfirm
+
+# Natija: dist/SUDPUBLIK.exe
 ```
+
+> **Diqqat:** PyInstaller cross-compile qilmaydi — Linux binarni Linux'da,
+> `.exe` ni Windows'da alohida qurish kerak.
 
 ---
 
@@ -131,7 +167,10 @@ sudparser/
 | Xato | Yechim |
 |------|--------|
 | `ModuleNotFoundError: ttkbootstrap` | `pip install ttkbootstrap` |
+| `ModuleNotFoundError: tkinter` (Linux) | `sudo apt install python3-tk` |
 | EXE ishga tushmaydi | Antivirus tekshiring, `dist/` papkasida ishga tushiring |
+| Linux binar ishga tushmaydi | `chmod +x dist/SudParser` qiling |
 | `400 Bad Request` | `startDate` parametrini tekshiring — null bo'lmasligi kerak |
 | `429 Too Many Requests` | So'rovlar oralig'ini oshiring (0.5s → 1s) |
-| Tray ikonkasi ko'rinmaydi | `pystray` to'g'ri o'rnatilganini tekshiring |
+| Tray ikonkasi ko'rinmaydi (Windows) | `pystray` to'g'ri o'rnatilganini tekshiring |
+| Tray ikonkasi ko'rinmaydi (Linux) | `sudo apt install gir1.2-appindicator3-0.1` |
