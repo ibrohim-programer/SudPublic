@@ -109,8 +109,11 @@ class SudApiClient:
         return resp.content
 
     def download_file_bytes(self, file_id: int) -> bytes:
-        """PDF faylni bytes sifatida yuklab olish"""
-        r = self._get(f"{BASE_URL}/api/file/download/{file_id}", stream=True, timeout=60)
+        """PDF faylni bytes sifatida yuklab olish (kam retry — uzoq osilmasin)"""
+        r = self._get(
+            f"{BASE_URL}/api/file/download/{file_id}",
+            stream=True, timeout=45, max_retries=3,
+        )
         return r.content
 
     # ─── Ichki yordamchi metodlar ────────────────────────────────────────────
@@ -148,10 +151,14 @@ class SudApiClient:
         """
         _timeout = timeout or self.config.timeout
         _retries = max_retries or self.config.retry_count
+        # Connect (ulanish) bosqichini 10s bilan cheklaymiz — sayt bloklasa
+        # dastur 60s osilib qolmasin. (connect, read) ko'rinishida.
+        _connect_to = min(10, _timeout)
+        _eff_timeout = (_connect_to, _timeout)
 
         for attempt in range(_retries):
             try:
-                r = self.session.get(url, params=params, timeout=_timeout, stream=stream)
+                r = self.session.get(url, params=params, timeout=_eff_timeout, stream=stream)
 
                 # Rate limit — kuting
                 if r.status_code == 429:

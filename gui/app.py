@@ -77,6 +77,10 @@ class SudParserApp(tb.Window):
         self.downloader: Optional[Downloader] = None
         self.monitor:    Optional[MonitorEngine] = None
 
+        # Hujjat turlari — oldindan standart ro'yxat bilan to'ldiriladi
+        # (API javobini kutmasdan ham "Yuklash" bosilsa xato bermasin).
+        self._doc_types = list(DEFAULT_DOC_TYPES)
+
         # ─── GUI qurish ───────────────────────────────────────────────────
         self._build_ui()
 
@@ -259,24 +263,13 @@ class SudParserApp(tb.Window):
         frame = tb.Labelframe(parent, text="  ⚙️  Sozlamalar  ", padding=10)
         frame.pack(fill=X, pady=8)
 
-        # Bir vaqtdagi yuklamalar
-        r1 = tb.Frame(frame); r1.pack(fill=X, pady=3)
-        tb.Label(r1, text="Bir vaqtda yuklash (oqim)", anchor="w").pack(side=LEFT, fill=X, expand=True)
-        self._workers_var = tk.IntVar(value=self.config.max_workers)
-        sp1 = tb.Spinbox(r1, from_=1, to=20, textvariable=self._workers_var, width=6)
-        sp1.pack(side=RIGHT)
-        add_tooltip(sp1, "Bir vaqtning o'zida nechta fayl yuklansin. Ko'p bo'lsa tezroq, "
-                         "lekin saytga yuk ko'proq tushadi (tavsiya: 5).")
-
-        # So'rovlar oralig'i
-        r2 = tb.Frame(frame); r2.pack(fill=X, pady=3)
-        tb.Label(r2, text="So'rovlar oralig'i (soniya)", anchor="w").pack(side=LEFT, fill=X, expand=True)
-        self._delay_var = tk.DoubleVar(value=self.config.request_delay)
-        sp2 = tb.Spinbox(r2, from_=0, to=10, increment=0.1,
-                         textvariable=self._delay_var, format="%.1f", width=6)
-        sp2.pack(side=RIGHT)
-        add_tooltip(sp2, "Har so'rov orasidagi tanaffus. 429 (Too Many Requests) "
-                         "xatosi chiqsa, qiymatni oshiring.")
+        # Ma'lumot: yuklash tezligi avtomatik boshqariladi
+        tb.Label(
+            frame,
+            text="Yuklash tezligi avtomatik moslashadi — sayt bloklamasligi uchun\n"
+                 "fayllar ketma-ket, 8-10 soniya oralig'ida yuklanadi.",
+            font=("Segoe UI", 8), bootstyle="secondary", justify="left",
+        ).pack(anchor="w", pady=(0, 6))
 
         # Monitoring oralig'i
         r3 = tb.Frame(frame); r3.pack(fill=X, pady=3)
@@ -288,7 +281,7 @@ class SudParserApp(tb.Window):
 
         # Mavjud fayllarni o'tkazib yuborish
         self._skip_var2 = tk.BooleanVar(value=self.config.skip_existing)
-        chk = tb.Checkbutton(frame, text="Mavjud fayllarni o'tkazib yubor",
+        chk = tb.Checkbutton(frame, text="Mavjud fayllarni o'tkazib yubor (qayta yuklamaslik)",
                              variable=self._skip_var2, bootstyle="primary-round-toggle")
         chk.pack(anchor="w", pady=(6, 0))
         add_tooltip(chk, "Allaqachon yuklab olingan fayllar qayta yuklanmaydi.")
@@ -321,7 +314,7 @@ class SudParserApp(tb.Window):
 
         self._btn_monitor = tb.Button(
             btn_frame, text="📡   Monitoringni yoqish",
-            command=self._start_monitor, bootstyle="success",
+            command=self._toggle_monitor, bootstyle="success",
         )
         self._btn_monitor.pack(side=LEFT, fill=X, expand=True, padx=4, ipady=4)
         add_tooltip(self._btn_monitor, "Yangi hujjatlarni avtomatik kuzatishni boshlaydi.")
@@ -355,11 +348,11 @@ class SudParserApp(tb.Window):
         b2.pack(side=LEFT, padx=4)
         add_tooltip(b2, "Eng so'nggi yuklash hisobotini (CSV) ochadi.")
         b3 = tb.Button(btn_log_row, text="🗑  Tozalash",
-                       command=lambda: self._log.clear(), bootstyle="secondary-outline")
+                       command=lambda: self._log.clear(), bootstyle="danger")
         b3.pack(side=RIGHT)
         add_tooltip(b3, "Jurnal oynasini tozalaydi (fayllarga ta'sir qilmaydi).")
 
-        self._log = ScrolledLog(log_frame, height=10)
+        self._log = ScrolledLog(log_frame, height=16)
         self._log.pack(fill=BOTH, expand=True)
 
     # ── Pastki holat paneli ─────────────────────────────────────────────────────
@@ -445,8 +438,8 @@ class SudParserApp(tb.Window):
         """Sozlamalarni config ga qo'llash"""
         from config import default_download_path
         self.config.download_path = self._path_var.get() or default_download_path()
-        self.config.max_workers   = max(1, self._workers_var.get())
-        self.config.request_delay = max(0.0, self._delay_var.get())
+        # Ketma-ket yuklash + adaptiv kechikish ishlatiladi (oqim/delay endi UI da yo'q)
+        self.config.max_workers   = 1
         self.config.skip_existing = self._skip_var2.get()
         self.config.monitor_interval_minutes = max(1, self._interval_var.get())
         self.config.monitor_interval_seconds = self.config.monitor_interval_minutes * 60
@@ -475,6 +468,10 @@ class SudParserApp(tb.Window):
         self._btn_start["state"]   = "disabled" if running else "normal"
         self._btn_monitor["state"] = "disabled" if running else "normal"
         self._btn_stop["state"]    = "normal" if running else "disabled"
+        if not running:
+            # Monitoring tugmasini standart ko'rinishga qaytarish
+            self._btn_monitor.configure(text="📡   Monitoringni yoqish",
+                                        bootstyle="success")
 
     def _reset_stats(self) -> None:
         self._stat_success = self._stat_failed = self._stat_skipped = self._stat_total = 0
@@ -486,6 +483,34 @@ class SudParserApp(tb.Window):
         except Exception:
             pass
 
+    def _is_busy(self) -> bool:
+        """
+        Hozir yuklash yoki monitoring ketyaptimi?
+        Agar bayroq band ko'rinsa-yu, lekin haqiqatda hech narsa ishlamasa —
+        bayroqni tiklaymiz (oldingi osilib qolgan holatdan chiqish).
+        """
+        thread_alive = bool(self._work_thread and self._work_thread.is_alive())
+        monitor_alive = bool(self.monitor and self.monitor.is_running)
+        if thread_alive or monitor_alive:
+            return True
+        # Hech narsa ishlamayapti — band bayrog'ini tiklaymiz
+        if self._running:
+            self._running = False
+            self._set_buttons(False)
+        return False
+
+    def _validate_dates(self) -> bool:
+        """Sana filtrini tekshirish: boshlanish sanasi oxirgisidan katta bo'lmasin."""
+        d_from = self._date_from._date
+        d_to = self._date_to._date
+        if d_from and d_to and d_from > d_to:
+            messagebox.showerror(
+                "Sana xatosi",
+                "Boshlanish sanasi ('dan') oxirgi sanadan ('gacha') katta bo'lmasligi kerak!",
+            )
+            return False
+        return True
+
     # ─────────────────────────────────────────────────────────────────────────
     # AMALLAR
     # ─────────────────────────────────────────────────────────────────────────
@@ -496,7 +521,9 @@ class SudParserApp(tb.Window):
         if not court_types:
             messagebox.showwarning("Ogohlantirish", "Kamida bitta yo'nalish tanlang!")
             return
-        if self._running:
+        if not self._validate_dates():
+            return
+        if self._is_busy():
             return
 
         self._apply_settings()
@@ -571,19 +598,31 @@ class SudParserApp(tb.Window):
             self.after(0, lambda: self._set_buttons(False))
             self.after(0, lambda: self._set_status("Tayyor"))
 
+    def _toggle_monitor(self) -> None:
+        """Monitoring tugmasi: yoqilgan bo'lsa o'chiradi, aks holda yoqadi."""
+        if self.monitor and self.monitor.is_running:
+            self._stop_all()
+        else:
+            self._start_monitor()
+
     def _start_monitor(self) -> None:
         """Monitoring rejimini yoqish"""
         court_types = self._get_selected_court_types()
         if not court_types:
             messagebox.showwarning("Ogohlantirish", "Kamida bitta yo'nalish tanlang!")
             return
-        if self._running:
+        if not self._validate_dates():
+            return
+        if self._is_busy():
             return
 
         self._apply_settings()
         self._stop_event.clear()
         self._running = True
         self._set_buttons(True)
+        # Monitoring tugmasi "o'chirish" ko'rinishiga o'tadi (faol qoladi)
+        self._btn_monitor.configure(text="⏸   Monitoringni o'chirish",
+                                    bootstyle="warning", state="normal")
         self.summary.reset()
         self.summary.mode = f"Monitoring ({self.config.monitor_interval_minutes} daqiqada bir)"
         self.summary.court_types = court_types
@@ -620,9 +659,12 @@ class SudParserApp(tb.Window):
         self._stop_event.set()
         if self.monitor and self.monitor.is_running:
             self.monitor.stop()
+        # Yuklash ipi tugashini qisqa kutamiz (osilib qolmasin)
+        if self._work_thread and self._work_thread.is_alive():
+            self._work_thread.join(timeout=3)
         self._running = False
         self._set_buttons(False)
-        self._set_status("To'xtatildi")
+        self._set_status("⏹ To'xtatildi")
         self._log_msg("⏹ Foydalanuvchi tomonidan to'xtatildi")
 
     def _toggle_monitor_from_tray(self) -> None:

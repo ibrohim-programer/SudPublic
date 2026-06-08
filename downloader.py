@@ -1,21 +1,49 @@
 # downloader.py — Fayl yuklab olish va saqlash
-# SudParser v3.0
+# SUDPUBLIK
 
 import time
+import random
 import threading
 from pathlib import Path
 from typing import Callable, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from api import Publication, COURT_FOLDERS
 from state_tracker import StateTracker, DownloadedRecord
 from utils import ensure_dir, now_str
 
 
+class AdaptiveDelay:
+    """
+    Adaptiv kechikish: sayt bloklamasligi uchun har fayl orasida kutadi.
+    Xato ko'paysa — kechikish oshadi, muvaffaqiyatda — asta kamayadi.
+    """
+
+    def __init__(self, base_min: float = 8.0, base_max: float = 10.0,
+                 hard_max: float = 20.0):
+        self.base_min = base_min
+        self.base_max = base_max
+        self.hard_max = hard_max
+        self.error_count = 0
+
+    def next_delay(self) -> float:
+        if self.error_count >= 3:
+            return random.uniform(self.hard_max - 3, self.hard_max)   # 17-20s
+        if self.error_count > 0:
+            return random.uniform(self.base_max, self.base_max + 4)    # 10-14s
+        return random.uniform(self.base_min, self.base_max)            # 8-10s
+
+    def on_success(self) -> None:
+        self.error_count = max(0, self.error_count - 1)
+
+    def on_error(self) -> None:
+        self.error_count += 1
+
+
 class Downloader:
     """
     PDF fayllarni yuklab olish va papkalarga saqlash.
-    ThreadPoolExecutor orqali parallel yuklash.
+    Ketma-ket (sequential) yuklaydi — har fayl orasida adaptiv kechikish bilan,
+    shunda sayt bizni bot deb bloklamaydi.
     """
 
     def __init__(self, api_client, state_tracker: StateTracker, config,
@@ -40,64 +68,59 @@ class Downloader:
         **filter_kwargs,
     ) -> dict:
         """
-        Berilgan yo'nalishlar bo'yicha barcha hujjatlarni yuklab olish.
-        Parallel ThreadPoolExecutor ishlatiladi.
-        stop_event.set() → to'xtaydi.
+        Berilgan yo'nalishlar bo'yicha barcha hujjatlarni KETMA-KET yuklab olish.
+        Har fayl orasida adaptiv kechikish — sayt bloklamasligi uchun.
+        stop_event.set() → darhol to'xtaydi.
         Natija: {"success": N, "failed": N, "skipped": N, "total_bytes": N}
         """
         stats = {"success": 0, "failed": 0, "skipped": 0, "total_bytes": 0}
+        delay = AdaptiveDelay()
 
-        with ThreadPoolExecutor(max_workers=self._config.max_workers) as pool:
-            futures = {}
+        for ct in court_types:
+            if stop_event.is_set():
+                break
 
-            for ct in court_types:
-                if stop_event.is_set():
-                    break
+            self._on_log(f"📂 {ct} yo'nalishi skanlanmoqda...")
+            try:
+                for pub in self._api.iter_all_pages(ct, stop_event=stop_event, **filter_kwargs):
+                    if stop_event.is_set():
+                        break
 
-                self._on_log(f"📂 {ct} yo'nalishi skanlanmoqda...")
-                try:
-                    for pub in self._api.iter_all_pages(ct, stop_event=stop_event, **filter_kwargs):
-                        if stop_event.is_set():
-                            break
+                    # Allaqachon yuklangan bo'lsa — o'tkazib yuborish
+                    if self._config.skip_existing and self._state.is_downloaded(pub.id):
+                        stats["skipped"] += 1
+                        self._on_progress(skipped=1)
+                        continue
 
-                        if self._config.skip_existing and self._state.is_downloaded(pub.id):
-                            stats["skipped"] += 1
-                            self._on_progress(skipped=1)
-                            continue
+                    if pub.primary_file is None:
+                        stats["skipped"] += 1
+                        self._on_progress(skipped=1)
+                        continue
 
-                        if pub.primary_file is None:
-                            stats["skipped"] += 1
-                            continue
+                    # Faylni yuklash (ketma-ket)
+                    result = self.download_publication(pub, ct, source=source)
 
-                        future = pool.submit(
-                            self.download_publication, pub, ct, source=source
-                        )
-                        futures[future] = pub
-                        time.sleep(self._config.request_delay)
-
-                except Exception as e:
-                    self._on_log(f"⚠️ {ct} xatolik: {e}")
-
-            # Natijalarni yig'ish
-            for future in as_completed(futures):
-                pub = futures[future]
-                try:
-                    result = future.result()
                     if result == "success":
                         stats["success"] += 1
                         f = pub.primary_file
                         stats["total_bytes"] += f.size if f else 0
                         self._on_progress(success=1)
+                        delay.on_success()
                     elif result == "skipped":
                         stats["skipped"] += 1
                         self._on_progress(skipped=1)
                     else:
                         stats["failed"] += 1
                         self._on_progress(failed=1)
-                except Exception as e:
-                    stats["failed"] += 1
-                    self._on_log(f"⚠️ Yuklash xatosi: {e}")
-                    self._on_progress(failed=1)
+                        delay.on_error()
+
+                    # Keyingi fayldan oldin adaptiv kutish (to'xtatish bilan uziladi)
+                    if not stop_event.is_set():
+                        wait_s = delay.next_delay()
+                        stop_event.wait(timeout=wait_s)
+
+            except Exception as e:
+                self._on_log(f"⚠️ {ct} xatolik: {e}")
 
         if on_done:
             on_done(stats)
