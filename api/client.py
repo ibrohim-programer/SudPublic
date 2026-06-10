@@ -116,6 +116,29 @@ class SudApiClient:
         )
         return r.content
 
+    def report_counts(self) -> Optional[dict]:
+        """
+        Iqtisodiy sudlar bo'yicha umumiy sonlar (publication.sud.uz/report/counts).
+        Qaytaradi: {"total":n, "first":n, "appeal":n, "cassation":n, "control":n}
+        yoki None (xatoda).
+        Maydonlar: first=Биринчи, appeal=Апелляция, cassation=Кассация,
+                   control=Тафтиш, allI=umumiy.
+        """
+        try:
+            r = self._get(f"{BASE_URL}/report/counts", max_retries=2)
+            d = self._unwrap(r.json())
+            if isinstance(d, str):
+                d = json.loads(d)
+            return {
+                "total":     d.get("allI"),
+                "first":     d.get("first"),
+                "appeal":    d.get("appeal"),
+                "cassation": d.get("cassation"),
+                "control":   d.get("control"),
+            }
+        except Exception:
+            return None
+
     # ─── Ichki yordamchi metodlar ────────────────────────────────────────────
 
     @staticmethod

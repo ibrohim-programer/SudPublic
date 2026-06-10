@@ -327,32 +327,24 @@ class SudParserApp(tb.Window):
         self.after(0, _apply)
 
     def _fetch_all_counts(self) -> None:
-        """Har court_type uchun umumiy va instansiya sonlarini ketma-ket olish."""
-        all_cts = []
-        for cat in CATEGORIES:
-            for sub in cat["subs"]:
-                all_cts.append(sub["court_type"])
-
-        for ct in all_cts:
-            self._counts.setdefault(ct, {})
-            # Umumiy son
-            self._counts[ct]["total"] = self._safe_total(ct, None)
+        """
+        Sonlarni olish.
+        - Иqтисодий: publication.sud.uz/report/counts (real).
+        - Qolganlari: endpoint hali aniqlanmagan → "—" (soxta son ko'rsatmaymiz).
+        """
+        rc = self.api.report_counts()
+        if rc and rc.get("total") is not None:
+            self._counts["ECONOMIC"] = {
+                "total":     rc.get("total"),
+                "FIRST":     rc.get("first"),
+                "APPEAL":    rc.get("appeal"),
+                "CASSATION": rc.get("cassation"),
+                "REVISION":  rc.get("control"),
+            }
             self._refresh_counts_ui()
-            # Instansiyalar
-            for _label, code in INSTANCES:
-                self._counts[ct][code] = self._safe_total(ct, code)
-                self._refresh_counts_ui()
-
-    def _safe_total(self, court_type: str, instance_code: Optional[str]):
-        """fetch_page(size=1).totalElements ni xavfsiz olish."""
-        try:
-            kw = {}
-            if instance_code:
-                kw["instance_type"] = instance_code
-            resp = self.api.fetch_page(court_type, page=0, size=1, **kw)
-            return resp.totalElements
-        except Exception:
-            return None
+            self._set_status("✅ Иqтисодий сонлари юкланди")
+        else:
+            self._set_status("⚠️ Сонларни юклашда муаммо (сайт ёпиқ бўлиши мумкин)")
 
     # ─────────────────────────────────────────────────────────────────────────
     # YUKLASH
