@@ -91,14 +91,6 @@ class SudParserApp(tb.Window):
         self.geometry(self.WINDOW_SIZE)
         self.minsize(940, 600)
 
-        # Ikonka
-        try:
-            from PIL import Image, ImageTk
-            self._icon_img = ImageTk.PhotoImage(Image.open(get_resource_path("assets/icon.png")))
-            self.iconphoto(True, self._icon_img)
-        except Exception:
-            pass
-
         # ─── Backend ob'ektlar ────────────────────────────────────────────
         self.config  = Config.load()
         self.api     = SudApiClient(self.config)
@@ -140,18 +132,10 @@ class SudParserApp(tb.Window):
         tb.Label(
             sidebar,
             text="Интернет тармоғида\nэълон қилинган\nсуд қарорлари",
-            font=("Segoe UI", 11, "bold"),
+            font=("Segoe UI", 12, "bold"),
             bootstyle="inverse-secondary",
             justify="left",
-        ).pack(anchor="w", padx=16, pady=(18, 10))
-
-        try:
-            from PIL import Image, ImageTk
-            img = Image.open(get_resource_path("assets/icon.png")).resize((150, 150))
-            self._emblem = ImageTk.PhotoImage(img)
-            tb.Label(sidebar, image=self._emblem, bootstyle="secondary").pack(pady=30)
-        except Exception:
-            pass
+        ).pack(anchor="w", padx=16, pady=(20, 10))
 
         tb.Label(
             sidebar, text=f"{self.APP_TITLE} {self.APP_VERSION}",
@@ -206,11 +190,11 @@ class SudParserApp(tb.Window):
 
         # Ikonka
         tb.Label(card, text=cat["icon"], font=("Segoe UI", 26),
-                 bootstyle="light").grid(row=0, column=0, rowspan=2, padx=(4, 14))
+                 bootstyle="inverse-light").grid(row=0, column=0, rowspan=2, padx=(4, 14))
 
         # Nomi
-        tb.Label(card, text=cat["name"], font=("Segoe UI", 11, "bold"),
-                 wraplength=190, justify="left", bootstyle="light").grid(
+        tb.Label(card, text=cat["name"], font=("Segoe UI", 12, "bold"),
+                 wraplength=200, justify="left", bootstyle="inverse-light").grid(
                      row=0, column=1, rowspan=2, sticky="w", padx=(0, 18))
 
         # Instansiya jadvali
@@ -218,10 +202,10 @@ class SudParserApp(tb.Window):
         inst_box.grid(row=0, column=2, rowspan=2, sticky="w", padx=(0, 18))
         for r, (label, code) in enumerate(INSTANCES):
             tb.Label(inst_box, text=label, font=("Segoe UI", 9),
-                     bootstyle="secondary").grid(row=r, column=0, sticky="w", padx=(0, 16))
+                     bootstyle="inverse-light").grid(row=r, column=0, sticky="w", padx=(0, 16))
             var = tk.StringVar(value="…")
             tb.Label(inst_box, textvariable=var, font=("Segoe UI", 9, "bold"),
-                     bootstyle="light").grid(row=r, column=1, sticky="e")
+                     bootstyle="inverse-light").grid(row=r, column=1, sticky="e")
             self._count_updaters.append(
                 lambda v=var, cts=subs_cts, c=code: v.set(_fmt(self._sum_counts(cts, c)))
             )
@@ -272,19 +256,19 @@ class SudParserApp(tb.Window):
         card.pack(fill=X)
 
         tb.Label(card, text="📄", font=("Segoe UI", 24),
-                 bootstyle="light").grid(row=0, column=0, rowspan=2, padx=(4, 14))
-        tb.Label(card, text=sub["title"], font=("Segoe UI", 12, "bold"),
-                 wraplength=210, justify="left", bootstyle="light").grid(
+                 bootstyle="inverse-light").grid(row=0, column=0, rowspan=2, padx=(4, 14))
+        tb.Label(card, text=sub["title"], font=("Segoe UI", 13, "bold"),
+                 wraplength=220, justify="left", bootstyle="inverse-light").grid(
                      row=0, column=1, rowspan=2, sticky="w", padx=(0, 18))
 
         inst_box = tb.Frame(card, bootstyle="light")
         inst_box.grid(row=0, column=2, rowspan=2, sticky="w", padx=(0, 18))
         for r, (label, code) in enumerate(INSTANCES):
             tb.Label(inst_box, text=label, font=("Segoe UI", 9),
-                     bootstyle="secondary").grid(row=r, column=0, sticky="w", padx=(0, 16))
+                     bootstyle="inverse-light").grid(row=r, column=0, sticky="w", padx=(0, 16))
             var = tk.StringVar(value="…")
             tb.Label(inst_box, textvariable=var, font=("Segoe UI", 9, "bold"),
-                     bootstyle="light").grid(row=r, column=1, sticky="e")
+                     bootstyle="inverse-light").grid(row=r, column=1, sticky="e")
             self._count_updaters.append(
                 lambda v=var, c=code, t=ct: v.set(_fmt(self._sum_counts([t], c)))
             )
@@ -309,8 +293,8 @@ class SudParserApp(tb.Window):
         dl_btn.pack(pady=2)
 
         prog_var = tk.StringVar(value="")
-        prog_lbl = tb.Label(card, textvariable=prog_var, font=("Segoe UI", 9),
-                            bootstyle="light", anchor="w")
+        prog_lbl = tb.Label(card, textvariable=prog_var, font=("Segoe UI", 10, "bold"),
+                            bootstyle="inverse-light", anchor="w")
         prog_lbl.grid(row=2, column=0, columnspan=6, sticky="we", pady=(8, 0))
 
         # Bu kartaning yuklash holatini saqlaymiz
