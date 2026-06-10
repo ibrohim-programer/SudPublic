@@ -49,13 +49,16 @@ class Downloader:
     def __init__(self, api_client, state_tracker: StateTracker, config,
                  csv_logger=None,
                  on_progress: Optional[Callable] = None,
-                 on_log: Optional[Callable] = None):
+                 on_log: Optional[Callable] = None,
+                 on_file: Optional[Callable] = None):
         self._api = api_client
         self._state = state_tracker
         self._config = config
         self._csv_logger = csv_logger
         self._on_progress = on_progress or (lambda *a, **kw: None)
         self._on_log = on_log or (lambda msg: None)
+        # on_file(filename: str, size_kb: float, result: str) — har fayl uchun
+        self._on_file = on_file or (lambda *a, **kw: None)
 
     # ─── Bir martalik toplu yuklash ─────────────────────────────────────────
 
@@ -113,6 +116,12 @@ class Downloader:
                         stats["failed"] += 1
                         self._on_progress(failed=1)
                         delay.on_error()
+
+                    # Jonli jadval uchun (filename, hajm, natija)
+                    try:
+                        self._on_file(pub.filename, pub.size_kb, result)
+                    except Exception:
+                        pass
 
                     # Keyingi fayldan oldin adaptiv kutish (to'xtatish bilan uziladi)
                     if not stop_event.is_set():

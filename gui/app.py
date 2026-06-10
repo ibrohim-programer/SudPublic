@@ -366,16 +366,19 @@ class SudParserApp(tb.Window):
                   command=self._clear_search_filters).pack(side=LEFT, padx=6)
         self._search_info = tk.StringVar(value="")
         tb.Label(r3, textvariable=self._search_info, bootstyle="info").pack(side=LEFT, padx=12)
-        tb.Button(r3, text="⬇  Барчасини юклаш", bootstyle="primary",
-                  command=self._download_all_search).pack(side=RIGHT)
+        self._btn_dl_all = tb.Button(r3, text="⬇  Барчасини юклаш", bootstyle="primary",
+                                     command=self._download_all_search)
+        self._btn_dl_all.pack(side=RIGHT)
 
         # ── Natijalar jadvali ─────────────────────────────────────────────
-        table_frame = tb.Frame(self._content)
-        table_frame.pack(fill=BOTH, expand=True, pady=(4, 0))
+        res_lf = tb.Labelframe(self._content, text="  📁  Натижалар  ", padding=4)
+        res_lf.pack(fill=BOTH, expand=True, pady=(4, 4))
+        table_frame = tb.Frame(res_lf)
+        table_frame.pack(fill=BOTH, expand=True)
 
         cols = [c[0] for c in self.TABLE_COLS] + ["pdf"]
         self._tree = tb.Treeview(table_frame, columns=cols, show="headings",
-                                 bootstyle="primary", height=12)
+                                 bootstyle="primary", height=9)
         for key, label, width in self.TABLE_COLS:
             self._tree.heading(key, text=label)
             self._tree.column(key, width=width, anchor="w")
@@ -386,8 +389,24 @@ class SudParserApp(tb.Window):
         self._tree.configure(yscrollcommand=vsb.set)
         self._tree.pack(side=LEFT, fill=BOTH, expand=True)
         vsb.pack(side=RIGHT, fill=Y)
-        # Qatorga 2 marta bosilsa — o'sha faylni yuklash
         self._tree.bind("<Double-1>", self._download_selected_row)
+
+        # ── Yuklanayotgan fayllar (jonli) ─────────────────────────────────
+        dl_lf = tb.Labelframe(self._content, text="  ⬇  Юкланаётган файллар  ", padding=4)
+        dl_lf.pack(fill=X, pady=(4, 0))
+        dframe = tb.Frame(dl_lf)
+        dframe.pack(fill=X)
+        self._dl_tree = tb.Treeview(dframe, columns=("no", "file", "size", "status"),
+                                    show="headings", bootstyle="success", height=6)
+        for key, label, w in [("no", "№", 46), ("file", "Файл номи", 460),
+                              ("size", "Ҳажм (KB)", 100), ("status", "Ҳолат", 120)]:
+            self._dl_tree.heading(key, text=label)
+            self._dl_tree.column(key, width=w, anchor="w")
+        dvsb = tb.Scrollbar(dframe, orient=VERTICAL, command=self._dl_tree.yview)
+        self._dl_tree.configure(yscrollcommand=dvsb.set)
+        self._dl_tree.pack(side=LEFT, fill=X, expand=True)
+        dvsb.pack(side=RIGHT, fill=Y)
+        self._dl_count = 0
 
         self._set_status("Филтрни танлаб 'Қидириш' ни босинг")
 
@@ -517,12 +536,43 @@ class SudParserApp(tb.Window):
         self._stat_success = 0
         self._stat_failed = 0
         self._active_prog_var = None
+
+        # Tugmani "Юкланмоқда..." holatiga o'tkazamiz
+        self._btn_dl_all.configure(text="⏳  Юкланмоқда...", state="disabled", bootstyle="warning")
+        # Jonli jadvalni tozalaymiz
+        for i in self._dl_tree.get_children():
+            self._dl_tree.delete(i)
+        self._dl_count = 0
         self._set_status("⏳ Барча файллар юкланмоқда...")
+
+        def on_file(filename, size_kb, result):
+            def add():
+                self._dl_count += 1
+                status = "✅ Юкланди" if result == "success" else (
+                    "⏭ Ўтказилди" if result == "skipped" else "❌ Хато")
+                self._dl_tree.insert("", "end", values=(self._dl_count, filename,
+                                                         _fmt(size_kb), status))
+                # oxirgi qatorga avtomatik aylantirish
+                kids = self._dl_tree.get_children()
+                if kids:
+                    self._dl_tree.see(kids[-1])
+            try:
+                self.after(0, add)
+            except Exception:
+                pass
+
+        def restore_btn():
+            try:
+                self._btn_dl_all.configure(text="⬇  Барчасини юклаш",
+                                           state="normal", bootstyle="primary")
+            except Exception:
+                pass
 
         def work():
             dl = Downloader(api_client=self.api, state_tracker=self.state,
                             config=self.config, csv_logger=self.csv_log,
-                            on_progress=self._update_progress, on_log=self._set_status)
+                            on_progress=self._update_progress, on_log=self._set_status,
+                            on_file=on_file)
             try:
                 stats = dl.download_all(court_types=[ct], stop_event=self._stop_event,
                                         source="qidiruv", **kw)
@@ -532,6 +582,10 @@ class SudParserApp(tb.Window):
                 self._set_status(f"❌ Хатолик: {e}")
             finally:
                 self._running = False
+                try:
+                    self.after(0, restore_btn)
+                except Exception:
+                    pass
 
         self._work_thread = threading.Thread(target=work, daemon=True)
         self._work_thread.start()
