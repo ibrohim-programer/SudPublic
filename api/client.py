@@ -79,6 +79,40 @@ class SudApiClient:
         r = self._get(PUBLICATIONS_URL, params=params)
         return self._parse_response(self._unwrap(r.json()))
 
+    def fetch_raw_page(
+        self,
+        court_type: str,
+        page: int = 0,
+        size: int = 50,
+        start_date_ms: Optional[int] = None,
+        end_date_ms: Optional[int] = None,
+        type_id: Optional[int] = None,
+        case_number: Optional[str] = None,
+        instance_type: Optional[str] = None,
+    ) -> dict:
+        """
+        Sahifani XOM (raw) holda olish — barcha maydonlar bilan
+        (judge, caseNumber, instance, hearingDate, result, sud nomi...).
+        Qaytaradi: {"content": [dict...], "totalElements": n, "totalPages": n, "last": bool}
+        """
+        params: dict = {"size": size, "page": page, "court_type": court_type}
+        if start_date_ms is not None:
+            params["startDate"] = start_date_ms
+        if end_date_ms is not None:
+            params["endDate"] = end_date_ms
+        if type_id:
+            params["typeId"] = type_id
+        if case_number and case_number.strip():
+            params["caseNumber"] = case_number.strip()
+        if instance_type and instance_type.strip():
+            params["instanceType"] = instance_type.strip()
+
+        r = self._get(PUBLICATIONS_URL, params=params)
+        d = self._unwrap(r.json())
+        if not isinstance(d, dict):
+            d = {}
+        return d
+
     def iter_all_pages(
         self,
         court_type: str,
