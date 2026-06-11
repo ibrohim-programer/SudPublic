@@ -463,7 +463,9 @@ class SudParserApp(tb.Window):
         dvsb.pack(side=RIGHT, fill=Y)
         self._dl_count = 0
 
-        self._set_status("Filtrni tanlab 'Qidirish' ni bosing")
+        # Standart holatda — barcha fayllarni avtomatik yuklab ko'rsatamiz
+        self._set_status("⏳ Ro'yxat yuklanmoqda...")
+        self.after(150, self._do_search)
 
     def _toggle_advanced(self) -> None:
         """Kengaytirilgan filtrlar panelini ko'rsatish/yashirish."""
