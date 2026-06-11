@@ -4,6 +4,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import threading
+import time
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -115,6 +116,7 @@ class SudParserApp(tb.Window):
 
         # Hujjat turlari (filtr uchun)
         self._doc_types = list(DEFAULT_DOC_TYPES)
+        self._search_token = None   # progressive qidiruvni bekor qilish uchun
 
         self._build_layout()
         self.show_dashboard()
@@ -163,6 +165,8 @@ class SudParserApp(tb.Window):
         self._content.pack(side=TOP, fill=BOTH, expand=True)
 
     def _clear_content(self) -> None:
+        # Ketayotgan qidiruvni bekor qilamiz (jadval yo'qolганda xato bo'lmasin)
+        self._search_token = None
         for w in self._content.winfo_children():
             w.destroy()
 
@@ -440,19 +444,46 @@ class SudParserApp(tb.Window):
         self._set_status("⏳ Qidirilmoqda...")
         for i in self._tree.get_children():
             self._tree.delete(i)
+        self._search_rows = []
+        # Oldingi qidiruvni bekor qilish uchun yangi "token"
+        self._search_token = token = object()
 
         def work():
-            try:
-                d = self.api.fetch_raw_page(ct, page=0, size=50, **kw)
-            except Exception as e:
-                self._set_status(f"❌ Qidirish xatosi: {e}")
-                return
-            rows = d.get("content", []) or []
-            total = d.get("totalElements", len(rows))
-            self._search_rows = rows
-            self.after(0, lambda: self._populate_tree(rows, total))
+            page = 0
+            shown = 0
+            total = None
+            while self._search_token is token:
+                try:
+                    d = self.api.fetch_raw_page(ct, page=page, size=100, **kw)
+                except Exception as e:
+                    self._set_status(f"❌ Qidirish xatosi: {e}")
+                    break
+                rows = d.get("content", []) or []
+                if total is None:
+                    total = d.get("totalElements", 0)
+                if not rows:
+                    break
+                start = shown
+                self._search_rows.extend(rows)
+                shown += len(rows)
+                self.after(0, lambda r=rows, s=start, t=total, sh=shown:
+                           self._append_rows(r, s, t, sh))
+                # oxirgi sahifa?
+                if d.get("last") or page >= (d.get("totalPages", 1) - 1):
+                    self._set_status(f"✅ Tugadi — {shown} ta natija (jami {_fmt(total)})")
+                    break
+                page += 1
+                # saytni bloklamaslik uchun kichik tanaffus
+                time.sleep(0.4)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _append_rows(self, rows: list, start_idx: int, total, shown: int) -> None:
+        for off, item in enumerate(rows):
+            idx = start_idx + off + 1
+            vals = self._row_values(idx, item) + ["📄 PDF"]
+            self._tree.insert("", "end", iid=str(idx - 1), values=vals)
+        self._search_info.set(f"Jami: {_fmt(total)} ta  (ko'rsatildi: {shown})")
 
     def _populate_tree(self, rows: list, total) -> None:
         for i in self._tree.get_children():
@@ -625,7 +656,8 @@ class SudParserApp(tb.Window):
         """
         rc = self.api.report_counts()
         if rc and rc.get("total") is not None:
-            self._counts["ECONOMIC"] = {
+            # 814591 — bu 2024 yildan AVVALGI (eski) iqtisodiy ma'lumot
+            self._counts["ECONOMIC_OLD"] = {
                 "total":     rc.get("total"),
                 "FIRST":     rc.get("first"),
                 "APPEAL":    rc.get("appeal"),
@@ -633,7 +665,7 @@ class SudParserApp(tb.Window):
                 "REVISION":  rc.get("control"),
             }
             self._refresh_counts_ui()
-            self._set_status("✅ Iqtisodiy sonlari yuklandi")
+            self._set_status("✅ Iqtisodiy (2024 gacha) sonlari yuklandi")
         else:
             self._set_status("⚠️ Sonlarni yuklashda muammo (sayt yopiq bo'lishi mumkin)")
 
