@@ -46,3 +46,32 @@ DEFAULT_DOC_TYPES: list[dict] = [
     {"id": 2298, "name": "Ижрочи рўйхат ҳақида ажрим"},
     {"id": 2441, "name": "Ажрим (мировой)"},
 ]
+
+# Ish natijasi (result) kodlari → o'zbekcha izoh (jadvalda ko'rsatish uchun)
+RESULT_LABELS: dict[str, str] = {
+    "FULFILLED":                   "Qanoatlantirilgan",
+    "PARTIALLY_FULFILLED":         "Qisman qanoatlantirilgan",
+    "REFUSED":                     "Rad etilgan",
+    "UNCONSIDERED":                "Ko'rmasdan qoldirilgan",
+    "BANKRUPT":                    "Bankrot deb topilgan",
+    "STOPPED":                     "Ish tugatilgan",
+    "AGREEMENT":                   "Yarashuv bitimi",
+    "APPEAL_UNCHANGED":            "Apellyatsiya: o'zgarishsiz",
+    "APPEAL_CHANGED":              "Apellyatsiya: o'zgartirilgan",
+    "APPEAL_STOPPED":              "Apellyatsiya: tugatilgan",
+    "APPEAL_CANCELLED_REFUSED":    "Apellyatsiya: bekor (rad)",
+    "APPEAL_CANCELLED_FULFILLED":  "Apellyatsiya: bekor (qanoat)",
+    "APPEAL_CANCELLED_STOPPED":    "Apellyatsiya: bekor (tugatilgan)",
+    "APPEAL_CANCELLED_AGREEMENT":  "Apellyatsiya: bekor (yarashuv)",
+    "CASSATION_RETURNED":          "Kassatsiya: qaytarilgan",
+    "CASSATION_UNCHANGED":         "Kassatsiya: o'zgarishsiz",
+    "CASSATION_CHANGED":           "Kassatsiya: o'zgartirilgan",
+    "CONTROL_PROTEST_FULFILLED":   "Nazorat: protest qanoatlantirildi",
+}
+
+
+def result_label(code) -> str:
+    """Result kodini o'zbekcha izohga aylantirish (topilmasa kodning o'zi)."""
+    if not code:
+        return ""
+    return RESULT_LABELS.get(str(code), str(code))

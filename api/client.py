@@ -89,6 +89,8 @@ class SudApiClient:
         type_id: Optional[int] = None,
         case_number: Optional[str] = None,
         instance_type: Optional[str] = None,
+        category: Optional[int] = None,
+        judge: Optional[str] = None,
     ) -> dict:
         """
         Sahifani XOM (raw) holda olish — barcha maydonlar bilan
@@ -106,6 +108,10 @@ class SudApiClient:
             params["caseNumber"] = case_number.strip()
         if instance_type and instance_type.strip():
             params["instanceType"] = instance_type.strip()
+        if category:
+            params["category"] = category
+        if judge and judge.strip():
+            params["judge"] = judge.strip()
 
         r = self._get(PUBLICATIONS_URL, params=params)
         d = self._unwrap(r.json())

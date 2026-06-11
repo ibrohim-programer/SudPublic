@@ -20,6 +20,7 @@ from downloader import Downloader
 from utils import get_resource_path, open_path, ensure_dir
 from gui.components import DateEntry
 from api import INSTANCE_TYPES, DEFAULT_DOC_TYPES
+from api.endpoints import result_label
 
 
 # ─── Sud turlari tuzilmasi ──────────────────────────────────────────────────
@@ -116,6 +117,7 @@ class SudParserApp(tb.Window):
 
         # Hujjat turlari (filtr uchun)
         self._doc_types = list(DEFAULT_DOC_TYPES)
+        self._categories = [{"id": 0, "name": "Barchasi"}]   # Ish turkumi (API dan yuklanadi)
         self._search_token = None   # progressive qidiruvni bekor qilish uchun
 
         self._build_layout()
@@ -336,46 +338,64 @@ class SudParserApp(tb.Window):
                   command=lambda: self.show_detail(self._current_cat)).pack(side=LEFT)
         tb.Label(top, text="   " + sub["title"], font=("Segoe UI", 13, "bold")).pack(side=LEFT)
 
-        # ── Filtrlar paneli ───────────────────────────────────────────────
-        flt = tb.Labelframe(self._content, text="  🔎  Filtrlar  ", padding=10)
-        flt.pack(fill=X, pady=(10, 8))
+        # ── Yuqori panel: oddiy qidiruv + tugmalar ────────────────────────
+        bar = tb.Frame(self._content)
+        bar.pack(fill=X, pady=(10, 4))
 
-        r1 = tb.Frame(flt); r1.pack(fill=X, pady=3)
-        tb.Label(r1, text="Sud hujjati turi:", width=18, anchor="w").pack(side=LEFT)
+        self._f_case = tk.StringVar()
+        tb.Label(bar, text="Ish raqami:").pack(side=LEFT)
+        case_e = tb.Entry(bar, textvariable=self._f_case, width=22)
+        case_e.pack(side=LEFT, padx=(4, 8))
+        tb.Button(bar, text="🔍  Qidirish", bootstyle="success",
+                  command=self._do_search).pack(side=LEFT)
+        self._btn_adv = tb.Button(bar, text="⚙  Kengaytirilgan qidirish",
+                                  bootstyle="warning-outline", command=self._toggle_advanced)
+        self._btn_adv.pack(side=LEFT, padx=6)
+        self._btn_dl_all = tb.Button(bar, text="⬇  Barchasini yuklash", bootstyle="primary",
+                                     command=self._download_all_search)
+        self._btn_dl_all.pack(side=RIGHT)
+        self._search_info = tk.StringVar(value="")
+        tb.Label(bar, textvariable=self._search_info, bootstyle="info").pack(side=RIGHT, padx=12)
+
+        # ── Kengaytirilgan filtrlar (standartda yashirin) ─────────────────
+        self._adv_frame = tb.Labelframe(self._content, text="  🔎  Kengaytirilgan filtrlar  ", padding=10)
+        self._adv_visible = False
+
+        r1 = tb.Frame(self._adv_frame); r1.pack(fill=X, pady=3)
+        tb.Label(r1, text="Sud hujjati turi:", width=16, anchor="w").pack(side=LEFT)
         self._f_type = tk.StringVar()
         type_cb = tb.Combobox(r1, textvariable=self._f_type, state="readonly", width=28)
         type_cb["values"] = [d["name"] for d in self._doc_types]
         type_cb.set(self._doc_types[0]["name"])
         type_cb.pack(side=LEFT, padx=(0, 18))
-        tb.Label(r1, text="Sud instansiyasi:", width=16, anchor="w").pack(side=LEFT)
+        tb.Label(r1, text="Sud instansiyasi:", width=15, anchor="w").pack(side=LEFT)
         self._f_inst = tk.StringVar()
         inst_cb = tb.Combobox(r1, textvariable=self._f_inst, state="readonly", width=22)
         inst_cb["values"] = list(INSTANCE_TYPES.values())
         inst_cb.set(list(INSTANCE_TYPES.values())[0])
         inst_cb.pack(side=LEFT)
 
-        r2 = tb.Frame(flt); r2.pack(fill=X, pady=3)
-        tb.Label(r2, text="Sanadan:", width=18, anchor="w").pack(side=LEFT)
-        self._f_date_from = DateEntry(r2); self._f_date_from.pack(side=LEFT, padx=(0, 18))
-        tb.Label(r2, text="Sanagacha:", width=10, anchor="w").pack(side=LEFT)
-        self._f_date_to = DateEntry(r2); self._f_date_to.pack(side=LEFT, padx=(0, 18))
-        tb.Label(r2, text="Ish raqami:", width=12, anchor="w").pack(side=LEFT)
-        self._f_case = tk.StringVar()
-        tb.Entry(r2, textvariable=self._f_case, width=18).pack(side=LEFT)
+        r2 = tb.Frame(self._adv_frame); r2.pack(fill=X, pady=3)
+        tb.Label(r2, text="Ish turkumi:", width=16, anchor="w").pack(side=LEFT)
+        self._f_cat = tk.StringVar()
+        self._cat_cb = tb.Combobox(r2, textvariable=self._f_cat, state="readonly", width=70)
+        self._cat_cb["values"] = [c["name"] for c in self._categories]
+        self._cat_cb.set(self._categories[0]["name"])
+        self._cat_cb.pack(side=LEFT)
 
-        r3 = tb.Frame(flt); r3.pack(fill=X, pady=(6, 0))
-        tb.Button(r3, text="🔍  Qidirish", bootstyle="success",
-                  command=self._do_search).pack(side=LEFT)
+        r3 = tb.Frame(self._adv_frame); r3.pack(fill=X, pady=3)
+        tb.Label(r3, text="Ishni ko'rgan sudya:", width=16, anchor="w").pack(side=LEFT)
+        self._f_judge = tk.StringVar()
+        tb.Entry(r3, textvariable=self._f_judge, width=30).pack(side=LEFT, padx=(0, 18))
+        tb.Label(r3, text="Sanadan:", width=8, anchor="w").pack(side=LEFT)
+        self._f_date_from = DateEntry(r3); self._f_date_from.pack(side=LEFT, padx=(0, 10))
+        tb.Label(r3, text="Sanagacha:", width=9, anchor="w").pack(side=LEFT)
+        self._f_date_to = DateEntry(r3); self._f_date_to.pack(side=LEFT, padx=(0, 18))
         tb.Button(r3, text="Tozalash", bootstyle="secondary-outline",
-                  command=self._clear_search_filters).pack(side=LEFT, padx=6)
-        self._search_info = tk.StringVar(value="")
-        tb.Label(r3, textvariable=self._search_info, bootstyle="info").pack(side=LEFT, padx=12)
-        self._btn_dl_all = tb.Button(r3, text="⬇  Barchasini yuklash", bootstyle="primary",
-                                     command=self._download_all_search)
-        self._btn_dl_all.pack(side=RIGHT)
+                  command=self._clear_search_filters).pack(side=LEFT)
 
         # ── Natijalar jadvali ─────────────────────────────────────────────
-        res_lf = tb.Labelframe(self._content, text="  📁  Natijalar  ", padding=4)
+        self._res_lf = res_lf = tb.Labelframe(self._content, text="  📁  Natijalar  ", padding=4)
         res_lf.pack(fill=BOTH, expand=True, pady=(4, 4))
         table_frame = tb.Frame(res_lf)
         table_frame.pack(fill=BOTH, expand=True)
@@ -414,9 +434,23 @@ class SudParserApp(tb.Window):
 
         self._set_status("Filtrni tanlab 'Qidirish' ni bosing")
 
+    def _toggle_advanced(self) -> None:
+        """Kengaytirilgan filtrlar panelini ko'rsatish/yashirish."""
+        self._adv_visible = not self._adv_visible
+        if self._adv_visible:
+            self._adv_frame.pack(fill=X, pady=(0, 8), before=self._res_lf)
+            self._btn_adv.configure(text="⚙  Filtrlarni yashirish")
+        else:
+            self._adv_frame.pack_forget()
+            self._btn_adv.configure(text="⚙  Kengaytirilgan qidirish")
+
     def _clear_search_filters(self) -> None:
         self._f_type.set(self._doc_types[0]["name"])
         self._f_inst.set(list(INSTANCE_TYPES.values())[0])
+        if hasattr(self, "_f_cat"):
+            self._f_cat.set(self._categories[0]["name"])
+        if hasattr(self, "_f_judge"):
+            self._f_judge.set("")
         self._f_date_from.clear()
         self._f_date_to.clear()
         self._f_case.set("")
@@ -434,6 +468,15 @@ class SudParserApp(tb.Window):
         for code, label in INSTANCE_TYPES.items():
             if label == seli and code:
                 kw["instance_type"] = code; break
+        # Ish turkumi (kategoriya)
+        selc = self._f_cat.get() if hasattr(self, "_f_cat") else ""
+        for c in self._categories:
+            if c["name"] == selc and c["id"]:
+                kw["category"] = c["id"]; break
+        # Sudya
+        jg = self._f_judge.get().strip() if hasattr(self, "_f_judge") else ""
+        if jg:
+            kw["judge"] = jg
         case = self._f_case.get().strip()
         if case: kw["case_number"] = case
         return kw
@@ -518,7 +561,7 @@ class SudParserApp(tb.Window):
             str(item.get("caseNumber") or ""),
             str(item.get("judge") or ""),
             str(date),
-            str(item.get("result") or ""),
+            result_label(item.get("result")),
             str(pt.get("name") or ""),
         ]
 
@@ -668,6 +711,16 @@ class SudParserApp(tb.Window):
             self._set_status("✅ Iqtisodiy (2024 gacha) sonlari yuklandi")
         else:
             self._set_status("⚠️ Sonlarni yuklashda muammo (sayt yopiq bo'lishi mumkin)")
+
+        # Ish turkumi (kategoriya) ro'yxatini yuklash
+        try:
+            cats = self.api.get_categories()
+            if isinstance(cats, list) and cats:
+                self._categories = [{"id": 0, "name": "Barchasi"}] + [
+                    {"id": c.get("id"), "name": c.get("name", "")} for c in cats
+                ]
+        except Exception:
+            pass
 
     # ─────────────────────────────────────────────────────────────────────────
     # YUKLASH
