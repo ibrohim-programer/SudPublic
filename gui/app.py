@@ -354,6 +354,9 @@ class SudParserApp(tb.Window):
         self._btn_dl_all = tb.Button(bar, text="⬇  Barchasini yuklash", bootstyle="primary",
                                      command=self._download_all_search)
         self._btn_dl_all.pack(side=RIGHT)
+        self._btn_more = tb.Button(bar, text="⬇ Ko'proq yuklash", bootstyle="info-outline",
+                                   command=self._fetch_search_page, state="disabled")
+        self._btn_more.pack(side=RIGHT, padx=6)
         self._search_info = tk.StringVar(value="")
         tb.Label(bar, textvariable=self._search_info, bootstyle="info").pack(side=RIGHT, padx=12)
 
@@ -483,50 +486,63 @@ class SudParserApp(tb.Window):
 
     def _do_search(self) -> None:
         ct = self._search_sub["court_type"]
-        kw = self._search_filter_kwargs()
+        self._search_kw = self._search_filter_kwargs()
+        self._search_page = 0
+        self._search_shown = 0
+        self._search_total = None
         self._set_status("⏳ Qidirilmoqda...")
         for i in self._tree.get_children():
             self._tree.delete(i)
         self._search_rows = []
-        # Oldingi qidiruvni bekor qilish uchun yangi "token"
-        self._search_token = token = object()
+        self._fetch_search_page(reset=True)
+
+    def _fetch_search_page(self, reset: bool = False) -> None:
+        """Bitta sahifani (100 ta) yuklab, jadvalga qo'shadi."""
+        if getattr(self, "_search_loading", False):
+            return
+        self._search_loading = True
+        ct = self._search_sub["court_type"]
+        page = self._search_page
+        if hasattr(self, "_btn_more"):
+            self._btn_more.configure(state="disabled")
 
         def work():
-            page = 0
-            shown = 0
-            total = None
-            while self._search_token is token:
-                try:
-                    d = self.api.fetch_raw_page(ct, page=page, size=100, **kw)
-                except Exception as e:
-                    self._set_status(f"❌ Qidirish xatosi: {e}")
-                    break
-                rows = d.get("content", []) or []
-                if total is None:
-                    total = d.get("totalElements", 0)
-                if not rows:
-                    break
-                start = shown
-                self._search_rows.extend(rows)
-                shown += len(rows)
-                self.after(0, lambda r=rows, s=start, t=total, sh=shown:
-                           self._append_rows(r, s, t, sh))
-                # oxirgi sahifa?
-                if d.get("last") or page >= (d.get("totalPages", 1) - 1):
-                    self._set_status(f"✅ Tugadi — {shown} ta natija (jami {_fmt(total)})")
-                    break
-                page += 1
-                # saytni bloklamaslik uchun kichik tanaffus
-                time.sleep(0.4)
+            try:
+                d = self.api.fetch_raw_page(ct, page=page, size=100, **self._search_kw)
+            except Exception as e:
+                self._search_loading = False
+                self._set_status(f"❌ Qidirish xatosi: {e}")
+                return
+            rows = d.get("content", []) or []
+            total = d.get("totalElements", 0)
+            last = d.get("last") or page >= (d.get("totalPages", 1) - 1)
+            self.after(0, lambda: self._on_page_loaded(rows, total, last))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _append_rows(self, rows: list, start_idx: int, total, shown: int) -> None:
+    def _on_page_loaded(self, rows: list, total, last: bool) -> None:
+        self._search_total = total
+        start = self._search_shown
+        self._search_rows.extend(rows)
         for off, item in enumerate(rows):
-            idx = start_idx + off + 1
+            idx = start + off + 1
             vals = self._row_values(idx, item) + ["📄 PDF"]
             self._tree.insert("", "end", iid=str(idx - 1), values=vals)
-        self._search_info.set(f"Jami: {_fmt(total)} ta  (ko'rsatildi: {shown})")
+        self._search_shown += len(rows)
+        self._search_page += 1
+        self._search_loading = False
+        self._search_info.set(f"Jami: {_fmt(total)} ta  (ko'rsatildi: {self._search_shown})")
+        # "Ko'proq" tugmasi holati
+        has_more = (not last) and len(rows) > 0
+        if hasattr(self, "_btn_more"):
+            self._btn_more.configure(state=("normal" if has_more else "disabled"))
+        if self._search_shown == 0:
+            self._set_status("Hech narsa topilmadi (filtrlarni tekshiring)")
+        elif has_more:
+            self._set_status(f"✅ {self._search_shown} ta ko'rsatildi (jami {_fmt(total)}) — "
+                             f"davomi uchun 'Ko'proq yuklash'")
+        else:
+            self._set_status(f"✅ Hammasi ko'rsatildi: {self._search_shown} ta")
 
     def _populate_tree(self, rows: list, total) -> None:
         for i in self._tree.get_children():
