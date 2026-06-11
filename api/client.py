@@ -43,6 +43,18 @@ class SudApiClient:
         r = self._get(CATEGORY_URL)
         return self._unwrap(r.json())
 
+    def get_courts(self, court_level: int) -> list[dict]:
+        """
+        Berilgan sud darajasi (courtType: 1=Oliy, 2=Viloyat, 3=Tuman) bo'yicha
+        sudlar ro'yxati. [{"id":..,"name":..}, ...]
+        """
+        try:
+            r = self._get(f"{BASE_URL}/unauthorized/courts", params={"courtType": court_level})
+            d = self._unwrap(r.json())
+            return d if isinstance(d, list) else []
+        except Exception:
+            return []
+
     def fetch_page(
         self,
         court_type: str,
@@ -91,6 +103,8 @@ class SudApiClient:
         instance_type: Optional[str] = None,
         category: Optional[int] = None,
         judge: Optional[str] = None,
+        court_level: Optional[int] = None,
+        court_id: Optional[int] = None,
     ) -> dict:
         """
         Sahifani XOM (raw) holda olish — barcha maydonlar bilan
@@ -112,6 +126,10 @@ class SudApiClient:
             params["category"] = category
         if judge and judge.strip():
             params["judge"] = judge.strip()
+        if court_level:
+            params["courtType"] = court_level
+        if court_id:
+            params["court"] = court_id
 
         r = self._get(PUBLICATIONS_URL, params=params)
         d = self._unwrap(r.json())
