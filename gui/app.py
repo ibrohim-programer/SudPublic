@@ -26,49 +26,49 @@ from api import INSTANCE_TYPES, DEFAULT_DOC_TYPES
 # Iqtisodiy → 2024 gacha (ECONOMIC_OLD) va 2024 dan keyin (ECONOMIC).
 CATEGORIES = [
     {
-        "name": "ИҚТИСОДИЙ СУДЛАР",
+        "name": "IQTISODIY SUDLAR",
         "icon": "🏦",
         "subs": [
-            {"court_type": "ECONOMIC_OLD", "title": "2024 йилдан аввал кўрилган ишлар"},
-            {"court_type": "ECONOMIC",     "title": "2024 йилдан кейинги кўрилган ишлар"},
+            {"court_type": "ECONOMIC_OLD", "title": "2024 yildan avval ko'rilgan ishlar"},
+            {"court_type": "ECONOMIC",     "title": "2024 yildan keyingi ko'rilgan ishlar"},
         ],
     },
     {
-        "name": "МАЪМУРИЙ СУДЛАР",
+        "name": "MA'MURIY SUDLAR",
         "icon": "📋",
         "subs": [
-            {"court_type": "ADMINISTRATIVE", "title": "Барча ишлар"},
+            {"court_type": "ADMINISTRATIVE", "title": "Barcha ishlar"},
         ],
     },
     {
-        "name": "ФУҚАРОЛИК ИШЛАРИ БЎЙИЧА СУДЛАР",
+        "name": "FUQAROLIK ISHLARI BO'YICHA SUDLAR",
         "icon": "👥",
         "subs": [
-            {"court_type": "CIVIL", "title": "Барча ишлар"},
+            {"court_type": "CIVIL", "title": "Barcha ishlar"},
         ],
     },
     {
-        "name": "ЖИНОЯТ ИШЛАРИ БЎЙИЧА СУДЛАР",
+        "name": "JINOYAT ISHLARI BO'YICHA SUDLAR",
         "icon": "⚖️",
         "subs": [
-            {"court_type": "CRIMINAL", "title": "Барча ишлар"},
+            {"court_type": "CRIMINAL", "title": "Barcha ishlar"},
         ],
     },
     {
-        "name": "МАЪМУРИЙ ҲУҚУҚБУЗАРЛИК БЎЙИЧА ИШЛАР",
+        "name": "MA'MURIY HUQUQBUZARLIK BO'YICHA ISHLAR",
         "icon": "📑",
         "subs": [
-            {"court_type": "ADMINISTRATIVE_OFFENCE", "title": "Барча ишлар"},
+            {"court_type": "ADMINISTRATIVE_OFFENCE", "title": "Barcha ishlar"},
         ],
     },
 ]
 
 # Instansiya turlari (label + API instanceType kodi)
 INSTANCES = [
-    ("Биринчи инстанция",      "FIRST"),
-    ("Апелляция инстанцияси",  "APPEAL"),
-    ("Кассация инстанцияси",   "CASSATION"),
-    ("Тафтиш",                 "REVISION"),
+    ("Birinchi instansiya",      "FIRST"),
+    ("Apellyatsiya instansiyasi", "APPEAL"),
+    ("Kassatsiya instansiyasi",  "CASSATION"),
+    ("Taftish",                  "REVISION"),
 ]
 
 
@@ -136,7 +136,7 @@ class SudParserApp(tb.Window):
 
         tb.Label(
             sidebar,
-            text="Интернет тармоғида\nэълон қилинган\nсуд қарорлари",
+            text="Internet tarmog'ida\ne'lon qilingan\nsud qarorlari",
             font=("Segoe UI", 12, "bold"),
             bootstyle="inverse-secondary",
             justify="left",
@@ -152,7 +152,7 @@ class SudParserApp(tb.Window):
         right.pack(side=LEFT, fill=BOTH, expand=True)
 
         # Pastki holat paneli (faqat kontent ostida)
-        self._status_var = tk.StringVar(value="Тайёр")
+        self._status_var = tk.StringVar(value="Tayyor")
         self._status_lbl = tb.Label(right, textvariable=self._status_var,
                                      bootstyle="secondary", anchor="center",
                                      font=("Segoe UI", 10))
@@ -176,13 +176,13 @@ class SudParserApp(tb.Window):
 
         header = tb.Frame(self._content)
         header.pack(fill=X, pady=(0, 12))
-        tb.Label(header, text="Суд қарорлари — йўналишлар",
+        tb.Label(header, text="Sud qarorlari — yo'nalishlar",
                  font=("Segoe UI", 15, "bold")).pack(side=LEFT)
 
         for idx, cat in enumerate(CATEGORIES):
             self._make_category_card(self._content, idx, cat)
 
-        self._set_status("Тайёр — йўналишни танланг")
+        self._set_status("Tayyor — yo'nalishni tanlang")
         self._refresh_counts_ui()
 
     def _make_category_card(self, parent, idx: int, cat: dict) -> None:
@@ -244,7 +244,7 @@ class SudParserApp(tb.Window):
 
         header = tb.Frame(self._content)
         header.pack(fill=X, pady=(0, 12))
-        tb.Button(header, text="←  Орқага", bootstyle="secondary",
+        tb.Button(header, text="←  Orqaga", bootstyle="secondary",
                   command=self.show_dashboard).pack(side=LEFT)
         tb.Label(header, text="   " + cat["name"], font=("Segoe UI", 14, "bold")).pack(side=LEFT)
 
@@ -310,13 +310,13 @@ class SudParserApp(tb.Window):
 
     TABLE_COLS = [
         ("no",       "№",                  46),
-        ("court",    "Суд номи",           220),
-        ("instance", "Суд инстанцияси",    130),
-        ("case",     "Иш рақами",          130),
-        ("judge",    "Ишни кўрган судья",  180),
-        ("date",     "Иш кўрилган сана",   120),
-        ("result",   "Иш натижаси",        160),
-        ("doctype",  "Суд хужжати тури",   160),
+        ("court",    "Sud nomi",           220),
+        ("instance", "Sud instansiyasi",   130),
+        ("case",     "Ish raqami",         130),
+        ("judge",    "Ishni ko'rgan sudya", 180),
+        ("date",     "Ish ko'rilgan sana", 120),
+        ("result",   "Ish natijasi",       160),
+        ("doctype",  "Sud hujjati turi",   160),
     ]
 
     def show_search(self, sub: dict) -> None:
@@ -328,22 +328,22 @@ class SudParserApp(tb.Window):
         # Sarlavha + orqaga
         top = tb.Frame(self._content)
         top.pack(fill=X)
-        tb.Button(top, text="←  Орқага", bootstyle="secondary",
+        tb.Button(top, text="←  Orqaga", bootstyle="secondary",
                   command=lambda: self.show_detail(self._current_cat)).pack(side=LEFT)
         tb.Label(top, text="   " + sub["title"], font=("Segoe UI", 13, "bold")).pack(side=LEFT)
 
         # ── Filtrlar paneli ───────────────────────────────────────────────
-        flt = tb.Labelframe(self._content, text="  🔎  Филтрлар  ", padding=10)
+        flt = tb.Labelframe(self._content, text="  🔎  Filtrlar  ", padding=10)
         flt.pack(fill=X, pady=(10, 8))
 
         r1 = tb.Frame(flt); r1.pack(fill=X, pady=3)
-        tb.Label(r1, text="Суд хужжати тури:", width=18, anchor="w").pack(side=LEFT)
+        tb.Label(r1, text="Sud hujjati turi:", width=18, anchor="w").pack(side=LEFT)
         self._f_type = tk.StringVar()
         type_cb = tb.Combobox(r1, textvariable=self._f_type, state="readonly", width=28)
         type_cb["values"] = [d["name"] for d in self._doc_types]
         type_cb.set(self._doc_types[0]["name"])
         type_cb.pack(side=LEFT, padx=(0, 18))
-        tb.Label(r1, text="Суд инстанцияси:", width=16, anchor="w").pack(side=LEFT)
+        tb.Label(r1, text="Sud instansiyasi:", width=16, anchor="w").pack(side=LEFT)
         self._f_inst = tk.StringVar()
         inst_cb = tb.Combobox(r1, textvariable=self._f_inst, state="readonly", width=22)
         inst_cb["values"] = list(INSTANCE_TYPES.values())
@@ -351,27 +351,27 @@ class SudParserApp(tb.Window):
         inst_cb.pack(side=LEFT)
 
         r2 = tb.Frame(flt); r2.pack(fill=X, pady=3)
-        tb.Label(r2, text="Санадан:", width=18, anchor="w").pack(side=LEFT)
+        tb.Label(r2, text="Sanadan:", width=18, anchor="w").pack(side=LEFT)
         self._f_date_from = DateEntry(r2); self._f_date_from.pack(side=LEFT, padx=(0, 18))
-        tb.Label(r2, text="Санагача:", width=10, anchor="w").pack(side=LEFT)
+        tb.Label(r2, text="Sanagacha:", width=10, anchor="w").pack(side=LEFT)
         self._f_date_to = DateEntry(r2); self._f_date_to.pack(side=LEFT, padx=(0, 18))
-        tb.Label(r2, text="Иш рақами:", width=12, anchor="w").pack(side=LEFT)
+        tb.Label(r2, text="Ish raqami:", width=12, anchor="w").pack(side=LEFT)
         self._f_case = tk.StringVar()
         tb.Entry(r2, textvariable=self._f_case, width=18).pack(side=LEFT)
 
         r3 = tb.Frame(flt); r3.pack(fill=X, pady=(6, 0))
-        tb.Button(r3, text="🔍  Қидириш", bootstyle="success",
+        tb.Button(r3, text="🔍  Qidirish", bootstyle="success",
                   command=self._do_search).pack(side=LEFT)
-        tb.Button(r3, text="Тозалаш", bootstyle="secondary-outline",
+        tb.Button(r3, text="Tozalash", bootstyle="secondary-outline",
                   command=self._clear_search_filters).pack(side=LEFT, padx=6)
         self._search_info = tk.StringVar(value="")
         tb.Label(r3, textvariable=self._search_info, bootstyle="info").pack(side=LEFT, padx=12)
-        self._btn_dl_all = tb.Button(r3, text="⬇  Барчасини юклаш", bootstyle="primary",
+        self._btn_dl_all = tb.Button(r3, text="⬇  Barchasini yuklash", bootstyle="primary",
                                      command=self._download_all_search)
         self._btn_dl_all.pack(side=RIGHT)
 
         # ── Natijalar jadvali ─────────────────────────────────────────────
-        res_lf = tb.Labelframe(self._content, text="  📁  Натижалар  ", padding=4)
+        res_lf = tb.Labelframe(self._content, text="  📁  Natijalar  ", padding=4)
         res_lf.pack(fill=BOTH, expand=True, pady=(4, 4))
         table_frame = tb.Frame(res_lf)
         table_frame.pack(fill=BOTH, expand=True)
@@ -382,7 +382,7 @@ class SudParserApp(tb.Window):
         for key, label, width in self.TABLE_COLS:
             self._tree.heading(key, text=label)
             self._tree.column(key, width=width, anchor="w")
-        self._tree.heading("pdf", text="Хужжат")
+        self._tree.heading("pdf", text="Hujjat")
         self._tree.column("pdf", width=80, anchor="center")
 
         vsb = tb.Scrollbar(table_frame, orient=VERTICAL, command=self._tree.yview)
@@ -392,14 +392,14 @@ class SudParserApp(tb.Window):
         self._tree.bind("<Double-1>", self._download_selected_row)
 
         # ── Yuklanayotgan fayllar (jonli) ─────────────────────────────────
-        dl_lf = tb.Labelframe(self._content, text="  ⬇  Юкланаётган файллар  ", padding=4)
+        dl_lf = tb.Labelframe(self._content, text="  ⬇  Yuklanayotgan fayllar  ", padding=4)
         dl_lf.pack(fill=X, pady=(4, 0))
         dframe = tb.Frame(dl_lf)
         dframe.pack(fill=X)
         self._dl_tree = tb.Treeview(dframe, columns=("no", "file", "size", "status"),
                                     show="headings", bootstyle="success", height=6)
-        for key, label, w in [("no", "№", 46), ("file", "Файл номи", 460),
-                              ("size", "Ҳажм (KB)", 100), ("status", "Ҳолат", 120)]:
+        for key, label, w in [("no", "№", 46), ("file", "Fayl nomi", 460),
+                              ("size", "Hajm (KB)", 100), ("status", "Holat", 120)]:
             self._dl_tree.heading(key, text=label)
             self._dl_tree.column(key, width=w, anchor="w")
         dvsb = tb.Scrollbar(dframe, orient=VERTICAL, command=self._dl_tree.yview)
@@ -408,7 +408,7 @@ class SudParserApp(tb.Window):
         dvsb.pack(side=RIGHT, fill=Y)
         self._dl_count = 0
 
-        self._set_status("Филтрни танлаб 'Қидириш' ни босинг")
+        self._set_status("Filtrni tanlab 'Qidirish' ni bosing")
 
     def _clear_search_filters(self) -> None:
         self._f_type.set(self._doc_types[0]["name"])
@@ -437,7 +437,7 @@ class SudParserApp(tb.Window):
     def _do_search(self) -> None:
         ct = self._search_sub["court_type"]
         kw = self._search_filter_kwargs()
-        self._set_status("⏳ Қидирилмоқда...")
+        self._set_status("⏳ Qidirilmoqda...")
         for i in self._tree.get_children():
             self._tree.delete(i)
 
@@ -445,7 +445,7 @@ class SudParserApp(tb.Window):
             try:
                 d = self.api.fetch_raw_page(ct, page=0, size=50, **kw)
             except Exception as e:
-                self._set_status(f"❌ Қидириш хатоси: {e}")
+                self._set_status(f"❌ Qidirish xatosi: {e}")
                 return
             rows = d.get("content", []) or []
             total = d.get("totalElements", len(rows))
@@ -460,8 +460,8 @@ class SudParserApp(tb.Window):
         for idx, item in enumerate(rows, 1):
             vals = self._row_values(idx, item) + ["📄 PDF"]
             self._tree.insert("", "end", iid=str(idx - 1), values=vals)
-        self._search_info.set(f"Жами: {_fmt(total)} та  (кўрсатилди: {len(rows)})")
-        self._set_status(f"✅ {len(rows)} та натижа кўрсатилди (жами {_fmt(total)})")
+        self._search_info.set(f"Jami: {_fmt(total)} ta  (ko'rsatildi: {len(rows)})")
+        self._set_status(f"✅ {len(rows)} ta natija ko'rsatildi (jami {_fmt(total)})")
 
     def _row_values(self, idx: int, item: dict) -> list:
         # Sud nomi — fayl ichidagi db.orgName dan
@@ -501,14 +501,14 @@ class SudParserApp(tb.Window):
         item = self._search_rows[idx]
         atts = item.get("attachmentsList") or []
         if not atts:
-            messagebox.showinfo("Маълумот", "Бу ёзувда файл йўқ.")
+            messagebox.showinfo("Ma'lumot", "Bu yozuvda fayl yo'q.")
             return
         fd = atts[0].get("fileData") or {}
         file_id = fd.get("id")
         name = f"{item.get('id')}_{fd.get('name', 'hujjat.pdf')}"
         if not file_id:
             return
-        self._set_status(f"⏳ Юкланмоқда: {name}")
+        self._set_status(f"⏳ Yuklanmoqda: {name}")
 
         def work():
             try:
@@ -517,16 +517,16 @@ class SudParserApp(tb.Window):
                 folder = COURT_FOLDERS.get(self._search_sub["court_type"], self._search_sub["court_type"])
                 dest = ensure_dir(Path(self.config.download_path) / folder) / name
                 dest.write_bytes(data)
-                self._set_status(f"✅ Юкланди: {name}")
+                self._set_status(f"✅ Yuklandi: {name}")
             except Exception as e:
-                self._set_status(f"❌ Хато: {e}")
+                self._set_status(f"❌ Xato: {e}")
 
         threading.Thread(target=work, daemon=True).start()
 
     def _download_all_search(self) -> None:
-        """Топилган барча файлларни (филтр бўйича) юклаш."""
+        """Topilgan barcha fayllarni (filtr bo'yicha) yuklash."""
         if self._is_busy():
-            messagebox.showinfo("Маълумот", "Аввалги юклаш тугашини кутинг.")
+            messagebox.showinfo("Ma'lumot", "Avvalgi yuklash tugashini kuting.")
             return
         ct = self._search_sub["court_type"]
         kw = self._search_filter_kwargs()
@@ -537,19 +537,19 @@ class SudParserApp(tb.Window):
         self._stat_failed = 0
         self._active_prog_var = None
 
-        # Tugmani "Юкланмоқда..." holatiga o'tkazamiz
-        self._btn_dl_all.configure(text="⏳  Юкланмоқда...", state="disabled", bootstyle="warning")
+        # Tugmani "Yuklanmoqda..." holatiga o'tkazamiz
+        self._btn_dl_all.configure(text="⏳  Yuklanmoqda...", state="disabled", bootstyle="warning")
         # Jonli jadvalni tozalaymiz
         for i in self._dl_tree.get_children():
             self._dl_tree.delete(i)
         self._dl_count = 0
-        self._set_status("⏳ Барча файллар юкланмоқда...")
+        self._set_status("⏳ Barcha fayllar yuklanmoqda...")
 
         def on_file(filename, size_kb, result):
             def add():
                 self._dl_count += 1
-                status = "✅ Юкланди" if result == "success" else (
-                    "⏭ Ўтказилди" if result == "skipped" else "❌ Хато")
+                status = "✅ Yuklandi" if result == "success" else (
+                    "⏭ O'tkazildi" if result == "skipped" else "❌ Xato")
                 self._dl_tree.insert("", "end", values=(self._dl_count, filename,
                                                          _fmt(size_kb), status))
                 # oxirgi qatorga avtomatik aylantirish
@@ -563,7 +563,7 @@ class SudParserApp(tb.Window):
 
         def restore_btn():
             try:
-                self._btn_dl_all.configure(text="⬇  Барчасини юклаш",
+                self._btn_dl_all.configure(text="⬇  Barchasini yuklash",
                                            state="normal", bootstyle="primary")
             except Exception:
                 pass
@@ -576,10 +576,10 @@ class SudParserApp(tb.Window):
             try:
                 stats = dl.download_all(court_types=[ct], stop_event=self._stop_event,
                                         source="qidiruv", **kw)
-                self._set_status(f"✅ Тугади — Юкланди: {stats['success']}, "
-                                 f"Хато: {stats['failed']}, Ўтказилди: {stats['skipped']}")
+                self._set_status(f"✅ Tugadi — Yuklandi: {stats['success']}, "
+                                 f"Xato: {stats['failed']}, O'tkazildi: {stats['skipped']}")
             except Exception as e:
-                self._set_status(f"❌ Хатолик: {e}")
+                self._set_status(f"❌ Xatolik: {e}")
             finally:
                 self._running = False
                 try:
@@ -620,7 +620,7 @@ class SudParserApp(tb.Window):
     def _fetch_all_counts(self) -> None:
         """
         Sonlarni olish.
-        - Иqтисодий: publication.sud.uz/report/counts (real).
+        - Iqtisodiy: publication.sud.uz/report/counts (real).
         - Qolganlari: endpoint hali aniqlanmagan → "—" (soxta son ko'rsatmaymiz).
         """
         rc = self.api.report_counts()
@@ -633,9 +633,9 @@ class SudParserApp(tb.Window):
                 "REVISION":  rc.get("control"),
             }
             self._refresh_counts_ui()
-            self._set_status("✅ Иqтисодий сонлари юкланди")
+            self._set_status("✅ Iqtisodiy sonlari yuklandi")
         else:
-            self._set_status("⚠️ Сонларни юклашда муаммо (сайт ёпиқ бўлиши мумкин)")
+            self._set_status("⚠️ Sonlarni yuklashda muammo (sayt yopiq bo'lishi mumkin)")
 
     # ─────────────────────────────────────────────────────────────────────────
     # YUKLASH
@@ -644,7 +644,7 @@ class SudParserApp(tb.Window):
     def _start_download(self, court_type: str, title: str) -> None:
         """Bitta yo'nalish (yil/tur) bo'yicha yuklashni boshlash."""
         if self._is_busy():
-            messagebox.showinfo("Маълумот", "Аввалги юклаш тугашини кутинг ёки тўхтатинг.")
+            messagebox.showinfo("Ma'lumot", "Avvalgi yuklash tugashini kuting yoki to'xtating.")
             return
 
         self._apply_settings()
@@ -658,9 +658,9 @@ class SudParserApp(tb.Window):
 
         # Faol kartaning progress o'zgaruvchisini topish
         self._active_prog_var = self._find_prog_var(court_type)
-        self._set_status(f"⏳ Юкланмоқда: {title}")
+        self._set_status(f"⏳ Yuklanmoqda: {title}")
         if self._active_prog_var:
-            self._active_prog_var.set("⏳ Бошланди...")
+            self._active_prog_var.set("⏳ Boshlandi...")
 
         self._work_thread = threading.Thread(
             target=self._download_worker,
@@ -691,13 +691,13 @@ class SudParserApp(tb.Window):
                 stop_event=self._stop_event,
                 source="bir_martalik",
             )
-            msg = (f"✅ Тугади — Юкланди: {stats['success']}, "
-                   f"Хато: {stats['failed']}, Ўтказилди: {stats['skipped']}")
+            msg = (f"✅ Tugadi — Yuklandi: {stats['success']}, "
+                   f"Xato: {stats['failed']}, O'tkazildi: {stats['skipped']}")
             self._set_status(msg)
             if self._active_prog_var:
                 self.after(0, lambda: self._active_prog_var.set(msg))
         except Exception as e:
-            self._set_status(f"❌ Хатолик: {e}")
+            self._set_status(f"❌ Xatolik: {e}")
         finally:
             self._running = False
 
@@ -705,7 +705,7 @@ class SudParserApp(tb.Window):
         self._stat_success += success
         self._stat_failed += failed
         if self._active_prog_var:
-            txt = f"⏳ Юкланди: {self._stat_success}  |  Хато: {self._stat_failed}"
+            txt = f"⏳ Yuklandi: {self._stat_success}  |  Xato: {self._stat_failed}"
             self.after(0, lambda: self._active_prog_var.set(txt))
 
     def _apply_settings(self) -> None:
