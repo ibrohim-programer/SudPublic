@@ -55,6 +55,15 @@ class SudApiClient:
         except Exception:
             return []
 
+    def get_judges(self, court_id: int) -> list[dict]:
+        """Berilgan sud (db id) bo'yicha sudyalar ro'yxati. [{"id":..,"name":..}, ...]"""
+        try:
+            r = self._get(f"{BASE_URL}/unauthorized/judges", params={"db": court_id})
+            d = self._unwrap(r.json())
+            return d if isinstance(d, list) else []
+        except Exception:
+            return []
+
     def fetch_page(
         self,
         court_type: str,

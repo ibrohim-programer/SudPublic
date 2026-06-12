@@ -374,10 +374,13 @@ class SudParserApp(tb.Window):
         self._court_cb = tb.Combobox(c1, textvariable=self._f_court, state="readonly",
                                      values=[x["name"] for x in self._courts])
         self._court_cb.pack(fill=X)
-        # Ишни кўрган судья
+        self._court_cb.bind("<<ComboboxSelected>>", lambda e: self._on_court_change())
+        # Ишни кўрган судья (dropdown — tanlangan sud sudyalari)
         c2 = cell(0, 2)
-        self._f_judge = tk.StringVar()
-        self._ph_entry(c2, self._f_judge, "Ishni ko'rgan sudya")
+        self._f_judge = tk.StringVar(value="Sudya (barchasi)")
+        self._judge_cb = tb.Combobox(c2, textvariable=self._f_judge,
+                                     values=["Sudya (barchasi)"])
+        self._judge_cb.pack(fill=X)
         # Иш туркуми
         c3 = cell(0, 3)
         self._f_cat = tk.StringVar(value=self._categories[0]["name"])
@@ -507,6 +510,31 @@ class SudParserApp(tb.Window):
                 return ""
         return v
 
+    def _on_court_change(self) -> None:
+        """Aniq sud tanlanganda — o'sha sud sudyalarini yuklash."""
+        court_id = None
+        sel = self._f_court.get()
+        for c in getattr(self, "_courts", []):
+            if c["name"] == sel:
+                court_id = c.get("id")
+                break
+        if not court_id:
+            self._judge_cb["values"] = ["Sudya (barchasi)"]
+            self._f_judge.set("Sudya (barchasi)")
+            return
+
+        def work():
+            judges = self.api.get_judges(court_id)
+            names = ["Sudya (barchasi)"] + [j.get("name", "") for j in judges]
+            def apply():
+                self._judge_cb["values"] = names
+                self._f_judge.set("Sudya (barchasi)")
+            try:
+                self.after(0, apply)
+            except Exception:
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
     def _on_court_level_change(self) -> None:
         """Sud darajasi tanlanganda — o'sha darajadagi sudlar ro'yxatini yuklash."""
         level = None
@@ -518,6 +546,8 @@ class SudParserApp(tb.Window):
             self._courts = [{"id": None, "name": "Sud (barchasi)"}]
             self._court_cb["values"] = [c["name"] for c in self._courts]
             self._f_court.set(self._courts[0]["name"])
+            self._judge_cb["values"] = ["Sudya (barchasi)"]
+            self._f_judge.set("Sudya (barchasi)")
             return
 
         def work():
@@ -528,6 +558,8 @@ class SudParserApp(tb.Window):
             def apply():
                 self._court_cb["values"] = [c["name"] for c in self._courts]
                 self._f_court.set(self._courts[0]["name"])
+                self._judge_cb["values"] = ["Sudya (barchasi)"]
+                self._f_judge.set("Sudya (barchasi)")
             try:
                 self.after(0, apply)
             except Exception:
@@ -542,6 +574,8 @@ class SudParserApp(tb.Window):
         self._courts = [{"id": None, "name": "Sud (barchasi)"}]
         self._court_cb["values"] = [c["name"] for c in self._courts]
         self._f_court.set(self._courts[0]["name"])
+        self._judge_cb["values"] = ["Sudya (barchasi)"]
+        self._f_judge.set("Sudya (barchasi)")
         # placeholder entry larni tiklash
         for var, ph in getattr(self, "_ph_list", []):
             var.set(ph)
@@ -572,9 +606,9 @@ class SudParserApp(tb.Window):
         for c in getattr(self, "_courts", []):
             if c["name"] == selct and c.get("id"):
                 kw["court_name"] = c["name"]; break
-        # Sudya
-        jg = self._val(self._f_judge)
-        if jg:
+        # Sudya (dropdown — "Sudya (barchasi)" = filtrlamaslik)
+        jg = self._f_judge.get().strip()
+        if jg and jg != "Sudya (barchasi)":
             kw["judge"] = jg
         case = self._val(self._f_case)
         if case:
