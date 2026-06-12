@@ -566,15 +566,12 @@ class SudParserApp(tb.Window):
         for c in self._categories:
             if c["name"] == selc and c["id"]:
                 kw["category"] = c["id"]; break
-        # Sud darajasi (Суд тури)
-        for name, num in self.COURT_LEVELS:
-            if name == self._f_courttype.get() and num:
-                kw["court_level"] = num; break
-        # Aniq sud (Суд)
+        # Sud darajasi (Суд тури) — faqat sudlar ro'yxatini chiqarish uchun
+        # Aniq sud (Суд) → dbName orqali filtr
         selct = self._f_court.get()
         for c in getattr(self, "_courts", []):
             if c["name"] == selct and c.get("id"):
-                kw["court_id"] = c["id"]; break
+                kw["court_name"] = c["name"]; break
         # Sudya
         jg = self._val(self._f_judge)
         if jg:

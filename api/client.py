@@ -104,7 +104,7 @@ class SudApiClient:
         category: Optional[int] = None,
         judge: Optional[str] = None,
         court_level: Optional[int] = None,
-        court_id: Optional[int] = None,
+        court_name: Optional[str] = None,
     ) -> dict:
         """
         Sahifani XOM (raw) holda olish — barcha maydonlar bilan
@@ -128,8 +128,9 @@ class SudApiClient:
             params["judge"] = judge.strip()
         if court_level:
             params["courtType"] = court_level
-        if court_id:
-            params["court"] = court_id
+        if court_name and court_name.strip():
+            # Sud bo'yicha filtr — sud NOMI orqali (dbName param ishlaydi)
+            params["dbName"] = court_name.strip()
 
         r = self._get(PUBLICATIONS_URL, params=params)
         d = self._unwrap(r.json())
